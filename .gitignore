@@ -1,0 +1,9 @@
+vhdl/
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi
+.*.swp
+*.aux
+*.log
+*.pyc

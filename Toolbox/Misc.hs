@@ -1,0 +1,78 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module Toolbox.Misc
+       ( showCodeLoc
+       , integerLitToU
+       , vS
+       , vzip3
+       , vzip4
+       , vzip5
+       , vunzip4
+       , edgeTrigger
+       ) where
+
+import Language.Haskell.TH
+import Control.Applicative
+--import Data.Tuple.Select
+import Unsafe.Coerce
+import CLaSH.Prelude
+
+instance Show Loc where
+        showsPrec _ l =   (loc_filename l ++) . (':':)
+                        . shows (fst $ loc_start l) . (':':)
+                        . shows (snd $ loc_start l) . (':':)
+
+{- A Template Haskell string literal with the location of the invocation of
+ - showCodeLoc
+ -}
+
+showCodeLoc = do loc <- location
+                 litE $ StringL (show loc)
+
+{- Convert an Integer expression to a constant of type "Unsigned n", with n
+ - being just large enough to contain the value
+ -}
+
+integerLitToU :: Integer -> ExpQ
+
+integerLitToU i = if i > toInteger (maxBound :: Unsigned 32) then
+                      fail
+                        (   "Clash cannot represent integer literals"
+                         ++ " larger than 32 bits")
+                  else
+                     sigE (litE $ integerL i)
+                            (appT
+                              (conT ''Unsigned)
+                              (  litT $ numTyLit $ toInteger $ max 1 $ floor
+                               $ 1 + logBase 2 (fromInteger i)))
+
+vS :: [Name] -> ExpQ
+
+vS [] = [| pure Nil |]
+vS (x:xs) = [| liftA2 (:>) $(varE x) $(vS xs) |]
+
+vzip3 as bs cs = (vzipWith (\a (b,c) -> (a,b,c)) as) (vzip bs cs)
+vzip4 as bs cs ds = (vzipWith (\a (b,c,d) -> (a,b,c,d)) as) (vzip3 bs cs ds)
+vzip5 as bs cs ds es
+    = (vzipWith (\a (b,c,d,e) -> (a,b,c,d,e)) as) (vzip4 bs cs ds es)
+
+vunzip4 :: Vec n (a,b,c,d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
+vunzip4 xs = (as, bs, cs, ds)
+    where
+--        as = vmap (sel1) xs
+--        bs = vmap (sel2) xs
+--        cs = vmap (sel3) xs
+--        ds = vmap (sel4) xs
+        as = vmap (\(a, b, c, d) -> a) xs
+        bs = vmap (\(a, b, c, d) -> b) xs
+        cs = vmap (\(a, b, c, d) -> c) xs
+        ds = vmap (\(a, b, c, d) -> d) xs
+
+edgeTrigger :: Eq a
+            => a
+            -> a
+            -> (a, Bool)
+
+edgeTrigger s i = (i, s /= i)
