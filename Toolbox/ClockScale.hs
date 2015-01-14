@@ -99,7 +99,11 @@ avg s (m, d, cmd) = (s', o)
  - periods.
  -
  - For more documentation, see `avg`.
+ -
+ - TODO: This is overly complicated; multiplier is completely superfluous if
+ - you are going to round off anyway!
  -}
+
 max :: (KnownNat n, KnownNat (n+1))
     => Unsigned (n+1)
     -> (Unsigned n, Unsigned n, State)
@@ -126,16 +130,6 @@ max s (m, d, cmd) = (s', o)
  - determined from the parameters.
  -}
 
---static :: (KnownNat n, KnownNat (n+1)
---          , Lift (   Unsigned (n+1)
---                  -> (Unsigned n, Unsigned n, State)
---                  -> (Unsigned (n+1), Bool)))
---       => (   Unsigned (n+1)
---           -> (Unsigned n, Unsigned n, State)
---           -> (Unsigned (n+1), Bool))
---       -> (Integer, Integer)
---       -> ExpQ
-
 staticAvg (m, d) = appE
                        (appE [| staticAvg' |] (integerLitToU m))
                        (integerLitToU d)
@@ -146,14 +140,20 @@ staticMax (m, d) = appE
 
 
 {-
- - Through Template Haskell, instantiate a clock scaler implementation `s` that
- - converts clock rate `from` to ticks with a rate of `to`, with static
- - parameters computed at compile time.
+ - Through Template Haskell, instantiate a clock scaler that converts clock
+ - rate `from` to ticks with a rate of `to`, with static parameters computed at
+ - compile time.
  -}
 
 staticAvgRate from to = staticAvg $ rateParams from to
 
 staticMaxRate from to = staticMax $ rateParams from to
+
+{-
+ - Through Template Haskell, instantiate a clock scaler that outputs a constant clock rate that has at least period `p`. 
+ -}
+
+staticMinPeriod fclk p = staticMax $ rateParams fclk $ truncate (1 / p)
 
 staticAvg' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
               , KnownNat m)
