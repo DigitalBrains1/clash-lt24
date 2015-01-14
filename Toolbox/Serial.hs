@@ -32,13 +32,13 @@ import qualified Toolbox.FIFO as FIFO
  -}
 
 output :: (Signal Bool, Signal Bool, Signal (Unsigned 8))
-       -> (Signal ClockScale.State, Signal Bool, Signal Bit)
+       -> (Signal CS.State, Signal Bool, Signal Bit)
 
 output = output' <^> (vcopyI L)
 
 output' :: Vec 10 Bit
         -> (Bool, Bool, Unsigned 8)
-        -> (Vec 10 Bit, (ClockScale.State, Bool, Bit))
+        -> (Vec 10 Bit, (CS.State, Bool, Bit))
 
 output' shifter (ck, ld, din) = (shifter', (scaler, done, txd))
     where
@@ -50,9 +50,9 @@ output' shifter (ck, ld, din) = (shifter', (scaler, done, txd))
                      shifter
         (scaler, done) = if shifter
                             == $(v [L, L, L, L, L, L, L, L, L, L]) then
-                           (ClockScale.Clear, True)
+                           (CS.Clear, True)
                          else
-                           (ClockScale.Run  , False)
+                           (CS.Run  , False)
         txd            = if done then
                            H
                          else

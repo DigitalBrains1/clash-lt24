@@ -7,7 +7,6 @@
 module Toolbox.FIFO
        ( Pntr
        , fifo
-       , prioFIFOs
        ) where
 
 import CLaSH.Prelude

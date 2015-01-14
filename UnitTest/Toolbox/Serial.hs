@@ -2,6 +2,7 @@
 
 module UnitTest.Toolbox.Serial
        ( module UnitTest.Toolbox.Serial
+       , module UnitTest.Common
        , module Toolbox.Serial
        ) where
 
@@ -11,6 +12,7 @@ import Data.Char
 import qualified Toolbox.ClockScale as CS
 import qualified Toolbox.FIFO as FIFO
 import Toolbox.Serial
+import UnitTest.Common
 
 outputTestInput delay1 delay2 =    take delay1 (repeat (False, undefined))
                                 ++ [ (True, 65) ] -- 01000001b
@@ -21,7 +23,7 @@ outputTestInput delay1 delay2 =    take delay1 (repeat (False, undefined))
 
 testOutputC scale (ld, din) = txd
     where
-        tick = (ClockScale.dynamic <^> (0 :: Unsigned 27))
+        tick = (CS.dynamic <^> (0 :: Unsigned 27))
                  (1, scale, scale_cmd)
         (scale_cmd, done, txd) = output (tick, ld, din)
 
@@ -70,7 +72,7 @@ halloRepeater s ck = (s',(ld, d))
 halloTransmitter = txd
     where
         (ld, d)            = (halloRepeater <^> 6) done
-        sTick              = ($(CS.staticRate 5000000 115200) <^> 1)
+        sTick              = ($(CS.staticRate fClk 115200) <^> 1)
                                stCmd
         (stCmd, done, txd) = output (sTick, ld, d)
 
@@ -82,19 +84,17 @@ halloTransmitterFIFO = txd
                                  ) (din, wrt, rd)
         (wrt, din)             = (halloRepeater <^> 6) (fmap not full)
         (rd, stCmd, txd)       = outputFIFO (sTick, empty, dout)
-        sTick                  = ($(CS.staticRate 5000000 115200) <^> 1)
+        sTick                  = ($(CS.staticRate fClk 115200) <^> 1)
                                    stCmd
 
 echoSwapCase rxd = txd
     where
         rxdS = register H $ register H rxd
-        tTick = (ClockScale.dynamic <^> 1)
-                  ( signal (72 :: Unsigned 12)
-                  , signal (3125 :: Unsigned 12)
-                  , tScaleCmd)
+        tTick = ($(CS.staticRate fClk 115200) <^> 1)
+                  tScaleCmd
         (tScaleCmd, _, txd) = output (tTick, dValid, swappedD)
         rTick = ($(CS.staticRate fClk (16*115200)) <^> 1)
-                  (signal ClockScale.Run)
+                  (signal CS.Run)
         (r, dValid) = input (rTick, rxdS)
         (frameErr, dIn) = unpack r
         swappedD = (xor 32) <$> dIn
