@@ -7,11 +7,15 @@
 module Toolbox.ClockScale
        ( rateParams
        , State(..)
-       , dynamic
-       , static
-       , staticRate
+       , avg
+       , max
+       , staticAvg
+       , staticAvgRate
+       , staticMax
+       , staticMaxRate
        ) where
 
+import Prelude hiding (max)
 import Language.Haskell.TH
 import CLaSH.Prelude
 import Toolbox.Misc
@@ -43,7 +47,7 @@ data State = Stop | Run | Clear
     deriving (Eq, Show)
 
 {-
- - Scale a clock frequency
+ - Scale a clock frequency as accurately as possible
  -
  - Outputs True once every "tick" of the desired frequency by counting and
  - scaling the system clock.
@@ -61,14 +65,47 @@ data State = Stop | Run | Clear
  - probably be more what you need:
  -
  - tick = (== ClockScale.Run) <$> cmd
+ -
+ - Note that it is designed to be instantiated with a static divisor and
+ - multiplier. Changing them while running will cause glitching.
  -}
 
-dynamic :: (KnownNat n, KnownNat (n+1))
-        => Unsigned (n+1)
-        -> (Unsigned n, Unsigned n, State)
-        -> (Unsigned (n+1), Bool)
+avg :: (KnownNat n, KnownNat (n+1))
+    => Unsigned (n+1)
+    -> (Unsigned n, Unsigned n, State)
+    -> (Unsigned (n+1), Bool)
 
-dynamic s (m, d, cmd) = (s', o)
+avg s (m, d, cmd) = (s', o)
+    where
+        sinc = s + resize m
+        wrap = s >= resize d
+        s'   = if cmd == Clear then
+                 1
+               else if wrap then
+                 sinc - resize d
+               else if cmd == Stop then
+                 s
+               else
+                 sinc
+        o    = wrap
+
+{-
+ - Scale a clock frequency, not exceeding the given bound
+ -
+ - Where `avg` tries to approximate the desired frequency as closesly as
+ - possible and might cause a short pulse to compensate for a long pulse, this
+ - implementation makes sure not to exceed the target frequency. Thus it is
+ - more suited to clock signals to peripherals that have minimum allowed
+ - periods.
+ -
+ - For more documentation, see `avg`.
+ -}
+max :: (KnownNat n, KnownNat (n+1))
+    => Unsigned (n+1)
+    -> (Unsigned n, Unsigned n, State)
+    -> (Unsigned (n+1), Bool)
+
+max s (m, d, cmd) = (s', o)
     where
         sinc = s + resize m
         wrap = s >= resize d
@@ -89,24 +126,49 @@ dynamic s (m, d, cmd) = (s', o)
  - determined from the parameters.
  -}
 
-static :: (Integer, Integer) -> ExpQ
+--static :: (KnownNat n, KnownNat (n+1)
+--          , Lift (   Unsigned (n+1)
+--                  -> (Unsigned n, Unsigned n, State)
+--                  -> (Unsigned (n+1), Bool)))
+--       => (   Unsigned (n+1)
+--           -> (Unsigned n, Unsigned n, State)
+--           -> (Unsigned (n+1), Bool))
+--       -> (Integer, Integer)
+--       -> ExpQ
 
-static (m, d) = appE
-                    (appE [| static' |] (integerLitToU m))
-                    (integerLitToU d)
+staticAvg (m, d) = appE
+                       (appE [| staticAvg' |] (integerLitToU m))
+                       (integerLitToU d)
+
+staticMax (m, d) = appE
+                       (appE [| staticMax' |] (integerLitToU m))
+                       (integerLitToU d)
+
 
 {-
- - Through Template Haskell, instantiate a clock scaler that converts clock
- - rate "from" to ticks with a rate of "to", with static parameters computed at
- - compile time.
+ - Through Template Haskell, instantiate a clock scaler implementation `s` that
+ - converts clock rate `from` to ticks with a rate of `to`, with static
+ - parameters computed at compile time.
  -}
 
-staticRate from to = static $ rateParams from to
+staticAvgRate from to = staticAvg $ rateParams from to
 
-static' :: (KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n, KnownNat m)
-        => Unsigned n
-        -> Unsigned m
-        -> Unsigned (Max m n + 1)
-        -> State
-        -> (Unsigned (Max m n + 1), Bool)
-static' m d s cmd = dynamic s (resize m, resize d, cmd)
+staticMaxRate from to = staticMax $ rateParams from to
+
+staticAvg' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
+              , KnownNat m)
+           => Unsigned n
+           -> Unsigned m
+           -> Unsigned (Max m n + 1)
+           -> State
+           -> (Unsigned (Max m n + 1), Bool)
+staticAvg' m d st cmd = avg st (resize m, resize d, cmd)
+
+staticMax' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
+              , KnownNat m)
+           => Unsigned n
+           -> Unsigned m
+           -> Unsigned (Max m n + 1)
+           -> State
+           -> (Unsigned (Max m n + 1), Bool)
+staticMax' m d st cmd = avg st (resize m, resize d, cmd)

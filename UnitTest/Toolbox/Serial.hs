@@ -23,7 +23,7 @@ outputTestInput delay1 delay2 =    take delay1 (repeat (False, undefined))
 
 testOutputC scale (ld, din) = txd
     where
-        tick = (CS.dynamic <^> (0 :: Unsigned 27))
+        tick = (CS.avg <^> (0 :: Unsigned 27))
                  (1, scale, scale_cmd)
         (scale_cmd, done, txd) = output (tick, ld, din)
 
@@ -72,7 +72,7 @@ halloRepeater s ck = (s',(ld, d))
 halloTransmitter = txd
     where
         (ld, d)            = (halloRepeater <^> 6) done
-        sTick              = ($(CS.staticRate fClk 115200) <^> 1)
+        sTick              = ($(CS.staticAvgRate fClk 115200) <^> 1)
                                stCmd
         (stCmd, done, txd) = output (sTick, ld, d)
 
@@ -84,17 +84,16 @@ halloTransmitterFIFO = txd
                                  ) (din, wrt, rd)
         (wrt, din)             = (halloRepeater <^> 6) (fmap not full)
         (rd, stCmd, txd)       = outputFIFO (sTick, empty, dout)
-        sTick                  = ($(CS.staticRate fClk 115200) <^> 1)
+        sTick                  = ($(CS.staticAvgRate fClk 115200) <^> 1)
                                    stCmd
 
 echoSwapCase rxd = txd
     where
-        rxdS = register H $ register H rxd
-        tTick = ($(CS.staticRate fClk 115200) <^> 1)
+        tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
                   tScaleCmd
         (tScaleCmd, _, txd) = output (tTick, dValid, swappedD)
-        rTick = ($(CS.staticRate fClk (16*115200)) <^> 1)
+        rTick = ($(CS.staticAvgRate fClk (16*115200)) <^> 1)
                   (signal CS.Run)
-        (r, dValid) = input (rTick, rxdS)
+        (r, dValid) = input (rTick, rxd)
         (frameErr, dIn) = unpack r
         swappedD = (xor 32) <$> dIn
