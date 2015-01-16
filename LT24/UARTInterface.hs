@@ -116,8 +116,8 @@ returnData' s@(RDState { rdMode = 0 }) (rxoFE, rxC, rxDW, ready, dout) =
  -}
 
 -- Frame error
-returnData' s@(RDState { rdMode = 0 }) (True , rxC, rxDW, ready, dout) =
-    (s               , (128, True))
+--returnData' s@(RDState { rdMode = 0 }) (True , rxC, rxDW, ready, dout) =
+--    (s               , (128, True))
 
 -- Idle, capture inputs
 returnData' s@(RDState { rdMode = 0 }) (rxoFE, rxC, rxDW, True , dout) =
