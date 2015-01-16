@@ -13,6 +13,8 @@ module Toolbox.ClockScale
        , staticAvgRate
        , staticMax
        , staticMaxRate
+       , ticksMinPeriod
+       , ticksMaxRate
        ) where
 
 import Prelude hiding (max)
@@ -172,3 +174,8 @@ staticMax' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
            -> State
            -> (Unsigned (Max m n + 1), Bool)
 staticMax' m d st cmd = avg st (resize m, resize d, cmd)
+
+ticksMinPeriod f p = litE $ integerL $ ceiling $ (fromInteger f) * p - 1
+
+ticksMaxRate from to = ticksMinPeriod from (1 / to)
+

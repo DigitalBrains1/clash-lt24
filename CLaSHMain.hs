@@ -1,4 +1,4 @@
 module CLaSHMain where
-import qualified UnitTest.Toolbox.Serial
+import qualified LT24.UARTInterface as UARTInterface
 
-topEntity = UnitTest.Toolbox.Serial.echoSwapCase
+topEntity = UARTInterface.intf
