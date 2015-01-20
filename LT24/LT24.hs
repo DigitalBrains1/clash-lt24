@@ -7,6 +7,7 @@ import qualified Toolbox.ClockScale as CS
 import Toolbox.PackInstances
 
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
+    deriving (Show, Eq)
 
 data LTState = LTIdle | LTRead | LTWrite
     deriving (Show, Eq)
@@ -31,7 +32,7 @@ lt24'1 s i = (s', (ready, dout, resx, dcx, wrx, rdx, ltdout, oe))
         s' = lt24'2 s i
         (is, _) = s
         (st, ibuf, obuf) = is
-        ready = st == LTIdle
+        ready = st == LTIdle && resx == H
         dout = ibuf
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 

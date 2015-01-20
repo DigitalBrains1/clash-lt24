@@ -25,21 +25,25 @@ intf i = o
         rTick = ($(CS.staticAvgRate fClk (16*115200)) <^> 1)
                   (signal CS.Run)
         (rxoF, rxoV) = Serial.input (rTick, rxd)
+
+        (txiV, txi, action, din) = commandIf (rxoF, rxoV, txDone, ready, dout)
+
+-- Command interface
+commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din)
+    where
         (rxoFE, rxo) = unpack rxoF
 
         rxVec = (groupBytes <^> (vcopy d3 (0 :: Unsigned 8))) (rxo, rxoV)
-        cValid = (countBytes <^> (0 :: Unsigned 2)) rxoV
+        cValid = (countBytes <^> (2 :: Unsigned 2)) rxoV
 
-        (action, din) = (passCommand <^> (LT24.NOP, 0, False))
+        (action, din) = (passCommand <^> (PCIdle, LT24.NOP, 0))
                           (rxC, rxDW, cValid, ready)
-
---        rxC = (vlast :: Vec 3 (Unsigned 8) -> Unsigned 8) <$> rxVec
---        rxDW = (fromBV . vconcat . vmap toBV . vinit) <$> rxVec
 
         (rxC, rxDW) = (unpack . (splitInput <$>) . pack) rxVec
 
         (txi, txiV) = (returnData <^> RDState 0 0 0 0)
                         (txDone, rxoFE, rxC, rxDW, ready, dout)
+
 
 combineOutput (txd, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((txd :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
@@ -74,19 +78,20 @@ countBytes s True  = (s', False)
     where
         s' = s - 1
 
-passCommand :: (LT24.Action, Unsigned 16, Bool)
-            -> (Unsigned 8, Unsigned 16, Bool, Bool)
-            -> ((LT24.Action, Unsigned 16, Bool), (LT24.Action, Unsigned 16))
+data PCState = PCIdle | PCWaitAccept | PCWaitReady
 
---          s                    (cmd, d, cValid, ready)
-passCommand s@(cbuf, dbuf, True) (cmd, d, cValid, False) = (s, (cbuf, dbuf))
-passCommand   (cbuf, dbuf, wait) (cmd, d, False , ready) = (s', (cbuf', d))
+passCommand :: (PCState, LT24.Action, Unsigned 16)
+            -> (Unsigned 8, Unsigned 16, Bool, Bool)
+            -> ((PCState, LT24.Action, Unsigned 16), (LT24.Action, Unsigned 16))
+
+--            (PCState      , cbuf, dbuf) (cmd, d, cValid, ready)
+
+passCommand s@(PCIdle       , cbuf, dbuf) (cmd, d, False , ready)
+    = (s , (cbuf, dbuf))
+passCommand   (PCIdle       , cbuf, dbuf) (cmd, d, True  , ready)
+    = (s', (cbuf', d  ))
     where
-        s' = (cbuf', dbuf, False)
-        cbuf' = LT24.NOP
-passCommand   (cbuf, dbuf, wait) (cmd, d, True  , ready) = (s', (cbuf', d))
-    where
-        s' = (cbuf', dbuf, True)
+        s' = (PCWaitAccept, cbuf', d)
         cbuf' = case cmd of
                     0 -> LT24.Reset
                     1 -> LT24.Command
@@ -94,6 +99,23 @@ passCommand   (cbuf, dbuf, wait) (cmd, d, True  , ready) = (s', (cbuf', d))
                     3 -> LT24.ReadFM
                     4 -> LT24.ReadID
                     _ -> LT24.NOP
+
+passCommand s@(PCWaitAccept , cbuf, dbuf) (cmd, d, cValid, True)
+    = (s , (cbuf , dbuf))
+
+passCommand   (PCWaitAccept , cbuf, dbuf) (cmd, d, cValid, False)
+    = (s', (cbuf', dbuf))
+    where
+        s' = (PCWaitReady, cbuf', dbuf)
+        cbuf' = LT24.NOP
+
+passCommand s@(PCWaitReady , cbuf, dbuf) (cmd, d, cValid, False)
+    = (s , (cbuf , dbuf))
+
+passCommand   (PCWaitReady , cbuf, dbuf) (cmd, d, cValid, True)
+    = (s', (cbuf , dbuf))
+    where
+        s' = (PCIdle, cbuf, dbuf)
 
 data RDState = RDState
     { rdMode :: Unsigned 3
