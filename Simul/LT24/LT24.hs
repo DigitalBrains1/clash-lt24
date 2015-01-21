@@ -17,3 +17,8 @@ simulateLT24 :: [(Action, Unsigned 16, Unsigned 16)]
 simulateLT24 = simulate (pack . lt24 . unpack)
              . (++ repeat (NOP, 0, 0))
 
+data ELLT24 = Action Action | DIn (Unsigned 16) | LTDIn (Unsigned 16)
+
+trELLT24 (action, din, ltdin) (Action action') = (action', din , ltdin )
+trELLT24 (action, din, ltdin) (DIn din'      ) = (action , din', ltdin )
+trELLT24 (action, din, ltdin) (LTDIn ltdin'  ) = (action , din , ltdin')
