@@ -9,7 +9,7 @@ import Toolbox.PackInstances
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
     deriving (Show, Eq)
 
-data LTState = LTIdle | LTRead | LTWrite
+data LTState = LTIdle | LTReset | LTRead | LTWrite
     deriving (Show, Eq)
 
 -- TODO: LCD_ON pin
@@ -32,7 +32,7 @@ lt24'1 s i = (s', (ready, dout, resx, dcx, wrx, rdx, ltdout, oe))
         s' = lt24'2 s i
         (is, _) = s
         (st, ibuf, obuf) = is
-        ready = st == LTIdle && resx == H
+        ready = st == LTIdle
         dout = ibuf
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
@@ -67,9 +67,9 @@ lt24'3 (LTIdle , ibuf, obuf) (NOP    , _  , ltdin) = ( (LTIdle , ibuf , obuf')
         obuf' = (H    , dcx , H   , H   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
-lt24'3 (LTIdle , ibuf, obuf) (Reset  , din, ltdin) = ( (LTIdle , ibuf , obuf')
+lt24'3 (LTIdle , ibuf, obuf) (Reset  , din, ltdin) = ( (LTReset, ibuf , obuf')
                                                      , $(CS.ticksMinPeriod fClk
-                                                           120e-6))
+                                                           10e-6))
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (L    , H   , H   , H   , ltdout , L  )
@@ -100,6 +100,14 @@ lt24'3 (LTIdle , ibuf, obuf) (ReadID , din, ltdin) = ( (LTRead , ibuf , obuf')
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , L   , ltdout , L  )
+        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
+
+lt24'3 (LTReset, ibuf, obuf) (action , din, ltdin) = ( (LTIdle , ibuf , obuf')
+                                                     , $(CS.ticksMinPeriod fClk
+                                                           120e-6))
+    where
+        --      (resx', dcx', wrx', rdx', ltdout', oe')
+        obuf' = (H    , H   , H   , H   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTWrite, ibuf, obuf) (action , din, ltdin) = ( (LTIdle , ibuf , obuf')
