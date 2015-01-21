@@ -14,11 +14,16 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
 
 -- TODO: LCD_ON pin
 
-lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oe)
+{- Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
+ - to the 3-state output buffer
+ -}
+lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oeD)
     where
         (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
         csx = signal L
+        oeD = register L oe
+        wrxD = register H wrx
 
 lt24'1 :: ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
           , Unsigned 13)
