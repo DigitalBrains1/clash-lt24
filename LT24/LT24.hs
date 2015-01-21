@@ -17,7 +17,7 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
 {- Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
  - to the 3-state output buffer
  -}
-lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oeD)
+lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrxD, rdx, ltdout, oeD)
     where
         (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
@@ -81,27 +81,27 @@ lt24'3 (LTIdle , ibuf, obuf) (Reset  , din, ltdin) = ( (LTReset, ibuf , obuf')
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTIdle , ibuf, obuf) (Command, din, ltdin) = ( (LTWrite, ibuf , obuf')
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , L   , L   , H   , din    , H  )
 
 lt24'3 (LTIdle , ibuf, obuf) (Write  , din, ltdin) = ( (LTWrite, ibuf , obuf')
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , L   , H   , din    , H  )
 
 lt24'3 (LTIdle , ibuf, obuf) (ReadFM , din, ltdin) = ( (LTRead , ibuf , obuf')
 -- max $(CS.ticksMinPeriod fClk 355e-9) ($(CS.ticksMinPeriod fClk 355e-9) + 1)
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , L   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTIdle , ibuf, obuf) (ReadID , din, ltdin) = ( (LTRead , ibuf , obuf')
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , L   , ltdout , L  )
@@ -116,14 +116,14 @@ lt24'3 (LTReset, ibuf, obuf) (action , din, ltdin) = ( (LTIdle , ibuf , obuf')
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTWrite, ibuf, obuf) (action , din, ltdin) = ( (LTIdle , ibuf , obuf')
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , dcx , H   , H   , ltdout , H  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTRead , ibuf, obuf) (action , din, ltdin) = ( (LTIdle , ibuf', obuf')
-                                                     , 19)
+                                                     , 21)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , H   , ltdout , L  )
