@@ -18,7 +18,7 @@ lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
         (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
-        csx = signal H
+        csx = signal L
 
 lt24'1 :: ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
           , Unsigned 13)
