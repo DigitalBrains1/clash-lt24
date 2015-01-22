@@ -1,6 +1,7 @@
-VHDL_TARGETS = vhdl
+VHDL_TARGETS = vhdl lt24top
 
 vhdl_TOP = CLaSHMain.hs
+lt24top_TOP = UnitTest/LT24/LT24/LT24Top.hs
 
 define VHDL_template
 $(1): $$($(1)_TOP)
