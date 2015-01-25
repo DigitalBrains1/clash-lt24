@@ -17,7 +17,8 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
 {- Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
  - to the 3-state output buffer
  -}
-lt24 (action, din, ltdin) = (ready, dout, csx, resx, dcx, wrxD, rdx, ltdout, oeD)
+lt24 (action, din, ltdin)
+    = (ready, dout, csx, resx, dcx, wrxD, rdx, ltdout, oeD)
     where
         (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
