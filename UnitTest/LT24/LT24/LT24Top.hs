@@ -25,9 +25,9 @@ splitInput :: Vec 35 Bit
 
 splitInput i = (action, din, ltdin)
     where
-        actionN = fromBV (vtake d3 i) :: Unsigned 3
+        actionN = fromBV (vtakeI i) :: Unsigned 3
         din = fromBV (vselect d3 d1 d16 i) :: Unsigned 16
-        ltdin = fromBV (vselect d19 d1 d16 i) :: Unsigned 16
+        ltdin = fromBV (vdropI i) :: Unsigned 16
 
         action = case actionN of
                    1 -> LT24.Reset
