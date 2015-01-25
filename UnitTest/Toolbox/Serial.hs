@@ -2,8 +2,8 @@
 
 module UnitTest.Toolbox.Serial
        ( module UnitTest.Toolbox.Serial
-       , module UnitTest.Common
        , module Toolbox.Serial
+       , module Toolbox.FClk
        ) where
 
 import Control.Applicative
@@ -12,7 +12,7 @@ import Data.Char
 import qualified Toolbox.ClockScale as CS
 import qualified Toolbox.FIFO as FIFO
 import Toolbox.Serial
-import UnitTest.Common
+import Toolbox.FClk
 
 outputTestInput delay1 delay2 =    take delay1 (repeat (False, undefined))
                                 ++ [ (True, 65) ] -- 01000001b

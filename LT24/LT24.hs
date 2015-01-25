@@ -2,9 +2,9 @@ module LT24.LT24 where
 
 import CLaSH.Prelude
 
-import LT24.Misc
 import qualified Toolbox.ClockScale as CS
 import Toolbox.PackInstances
+import Toolbox.FClk
 
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
     deriving (Show, Eq)

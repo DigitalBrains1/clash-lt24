@@ -6,7 +6,7 @@ import Control.Applicative
 import qualified LT24.LT24 as LT24
 import qualified Toolbox.Serial as Serial
 import qualified Toolbox.ClockScale as CS
-import LT24.Misc
+import Toolbox.FClk
 
 intf i = o
     where
