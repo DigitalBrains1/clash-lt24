@@ -86,8 +86,8 @@ initLt24'' (10, _) = (LT24.Command, cDISPON      )
  -}
 
 lt24WithInit (action_daisy, din_daisy, ltdin)
-    = (ready_daisy, dout, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = (ready_daisy, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
-    (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
         = LT24.lt24 (action, din, ltdin)
     (action, din, ready_daisy) = initLt24 (ready, action_daisy, din_daisy)

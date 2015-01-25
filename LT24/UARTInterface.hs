@@ -11,12 +11,12 @@ import Toolbox.FClk
 intf i = o
     where
         o = ((combineOutput <$>) . pack)
-              (txd, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
 
         rxd = vhead <$> i
         ltdin = (fromBV . vtail) <$> i
 
-        (ready, dout, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
             LT24.lt24 (action, din, ltdin)
 
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
@@ -33,8 +33,8 @@ commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din)
     where
         (rxoFE, rxo) = unpack rxoF
 
-        rxVec = (groupBytes <^> (vcopy d3 (0 :: Unsigned 8))) (rxo, rxoV)
-        cValid = (countBytes <^> (2 :: Unsigned 2)) rxoV
+        rxVec = (groupBytes <^> (vcopyI 0)) (rxo, rxoV)
+        cValid = (countBytes <^> 2) rxoV
 
         (action, din) = (passCommand <^> (PCIdle, LT24.NOP, 0))
                           (rxC, rxDW, cValid, ready)
@@ -45,21 +45,14 @@ commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din)
                         (txDone, rxoFE, rxC, rxDW, ready, dout)
 
 
-combineOutput (txd, csx, resx, dcx, wrx, rdx, ltdout, oe)
-    = ((txd :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+combineOutput (txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = ((txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
-
-splitInput :: Vec 3 (Unsigned 8)
-           -> (Unsigned 8, Unsigned 16)
 
 splitInput i = (cmd, d)
     where
         cmd = vlast i
         d   = (fromBV . vconcat . vmap toBV . vinit) i
-
-groupBytes :: Vec 3 (Unsigned 8)
-           -> (Unsigned 8, Bool)
-           -> (Vec 3 (Unsigned 8), Vec 3 (Unsigned 8))
 
 --           (rxo, rxoV  )
 groupBytes s (_  , False ) = (s,s)

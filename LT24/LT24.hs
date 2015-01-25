@@ -12,16 +12,15 @@ data Action = NOP | Reset | Command | Write | ReadFM | ReadID
 data LTState = LTIdle | LTReset | LTRead | LTWrite
     deriving (Show, Eq)
 
--- TODO: LCD_ON pin
-
 {- Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
  - to the 3-state output buffer
  -}
 lt24 (action, din, ltdin)
-    = (ready, dout, csx, resx, dcx, wrxD, rdx, ltdout, oeD)
+    = (ready, dout, lcd_on, csx, resx, dcx, wrxD, rdx, ltdout, oeD)
     where
         (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
+        lcd_on = signal H
         csx = signal L
         oeD = register L oe
         wrxD = register H wrx
