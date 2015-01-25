@@ -1,7 +1,8 @@
-VHDL_TARGETS = vhdl uartinterface lt24top
+VHDL_TARGETS = vhdl uartif uartif_inited lt24top
 
 vhdl_TOP = CLaSHMain.hs
-uartinterface_TOP = UnitTest/LT24/UARTInterface.hs
+uartif_TOP = UnitTest/LT24/UARTInterface/IntfBare.hs
+uartif_inited_TOP = UnitTest/LT24/UARTInterface/IntfInited.hs
 lt24top_TOP = UnitTest/LT24/LT24/LT24Top.hs
 
 define VHDL_template

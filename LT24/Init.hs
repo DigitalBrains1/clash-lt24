@@ -1,4 +1,7 @@
-module LT24.Init where
+module LT24.Init
+       ( initLt24
+       , lt24WithInit
+       ) where
 
 import CLaSH.Prelude
 
