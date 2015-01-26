@@ -99,25 +99,22 @@ class UartIf(object):
 
     def colorbars(self):
         self.lt24_command(self.RAMWR)
-        color = 0
         for colblock in range(3):
             for coloffset in range(3):
                 for elementwidth in range(32):
                     for rowblock in range(2):
                         for element in range(3):
-                            color = (rowblock + element + coloffset) % 3
+                            color = (element + coloffset) % 3
                             self.gradient(color, 32)
-                    color = (rowblock + element + coloffset + 1) % 3
+                    color = coloffset % 3
                     self.gradient(color, 32)
-                    color = (rowblock + element + coloffset + 2) % 3
+                    color = (coloffset + 1) % 3
                     self.gradient(color, 16)
         for elementwidth in range(32):
             for rowblock in range(2):
                 for element in range(3):
-                    color = (rowblock + element + coloffset + 2) % 3
+                    color = element
                     self.gradient(color, 32)
-                    color = (color + 1) % 3
-            self.gradient(color, 32)
-            color = (color + 1) % 3
-            self.gradient(color, 16)
+            self.gradient(0, 32)
+            self.gradient(1, 16)
 
