@@ -55,23 +55,24 @@ import Toolbox.FClk
  - 4 -> LT24.ReadID
  -}
 
-intfBare = intf LT24.lt24
+--intfBare = intf LT24.lt24
 
 {-
  - Create an UART interface, resetting the LT24 on powerup / reset
  -}
-intfInited = intf lt24WithInit
+--intfInited = intf lt24WithInit
+intfInited = intf
 
-intf lt24 i = o
+intf i = o
     where
         o = ((combineOutput <$>) . pack)
-              (txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (trigger, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
 
         rxd = vhead <$> i
         ltdin = (fromBV . vtail) <$> i
 
-        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
-            lt24 (action, din, ltdin)
+        (trigger, ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+            lt24WithInit (action, din, ltdin)
 
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
                   sCmd
@@ -89,8 +90,8 @@ intf lt24 i = o
  - topEntity are combined into a bitvector. The VHDL wrapper then untangles the
  - vector.
  -}
-combineOutput (txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
-    = ((txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+combineOutput (trigger, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = ((trigger :> txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
 -- Command interface

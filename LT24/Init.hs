@@ -4,6 +4,7 @@ module LT24.Init
        ) where
 
 import CLaSH.Prelude
+import Control.Applicative
 import Language.Haskell.TH
 import qualified LT24.LT24 as LT24
 import LT24.Commands
@@ -67,6 +68,7 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       (10, $(litP $ integerL
                              $ $(CS.ticksMinPeriod fClk 120e-3)))
                                -> (ip, 0  )
+--                      (10, 123) -> (ip, 0)
                       (10, _ ) -> (i , sip)
                       ( _, _ ) -> (ip, 0  )
         (i', si', ph') = case (i, ph, ready) of
@@ -106,8 +108,10 @@ initLt24'' ( _, _) = (LT24.NOP    , 0            )
  -}
 
 lt24WithInit (action_daisy, din_daisy, ltdin)
-    = (ready_daisy, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = (trigger, ready_daisy, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
     (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
         = LT24.lt24 (action, din, ltdin)
     (action, din, ready_daisy) = initLt24 (ready, action_daisy, din_daisy)
+
+    trigger = (vexact d8 . toBV) <$> din
