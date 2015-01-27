@@ -132,13 +132,9 @@ max s (m, d, cmd) = (s', o)
  - determined from the parameters.
  -}
 
-staticAvg (m, d) = appE
-                       (appE [| staticAvg' |] (integerLitToU m))
-                       (integerLitToU d)
+staticAvg (m, d) = appE (appE [| staticAvg' |] (fitU m)) (fitU d)
 
-staticMax (m, d) = appE
-                       (appE [| staticMax' |] (integerLitToU m))
-                       (integerLitToU d)
+staticMax (m, d) = appE (appE [| staticMax' |] (fitU m)) (fitU d)
 
 
 {-

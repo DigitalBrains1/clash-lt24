@@ -4,7 +4,9 @@
 
 module Toolbox.Misc
        ( showCodeLoc
-       , integerLitToU
+       , intLit
+       , uToFit
+       , fitU
        , vS
        , vzip3
        , vzip4
@@ -31,22 +33,34 @@ instance Show Loc where
 showCodeLoc = do loc <- location
                  litE $ StringL (show loc)
 
+-- Shorthand for creating an integer literal
+
+intLit :: Integer -> ExpQ
+
+intLit = litE . integerL
+
+{- Construct an Unsigned n type with n just large enough to be able to
+ - represent the number i
+ -}
+
+uToFit :: Integer -> TypeQ
+
+uToFit i = (appT (conT ''Unsigned)
+                 (  litT $ numTyLit $ toInteger $ max 1 $ floor
+                  $ 1 + logBase 2 (fromInteger i)))
+
 {- Convert an Integer expression to a constant of type "Unsigned n", with n
  - being just large enough to contain the value
  -}
 
-integerLitToU :: Integer -> ExpQ
+fitU :: Integer -> ExpQ
 
-integerLitToU i = if i > toInteger (maxBound :: Unsigned 32) then
-                      fail
-                        (   "Clash cannot represent integer literals"
-                         ++ " larger than 32 bits")
-                  else
-                     sigE (litE $ integerL i)
-                            (appT
-                              (conT ''Unsigned)
-                              (  litT $ numTyLit $ toInteger $ max 1 $ floor
-                               $ 1 + logBase 2 (fromInteger i)))
+fitU i = if i > toInteger (maxBound :: Unsigned 32) then
+             fail
+               (   "Clash cannot represent integer literals"
+                ++ " larger than 32 bits")
+         else
+            sigE (intLit i) (uToFit i)
 
 vS :: [Name] -> ExpQ
 
