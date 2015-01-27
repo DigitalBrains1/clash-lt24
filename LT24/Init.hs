@@ -28,14 +28,16 @@ import Toolbox.FClk
  - passing the commands and data from the daisy-chained component.
  -
  - `(i, si)` is a pair (index, subindex) that indexes the list of commands to
- - send to LT24.lt24. When `i` reaches 13, initialisation is done. The way 
- - `i` = 13 is special-cased in the next-state expression means that the state
- - is quiescent once reaching completion. If it were not special-cased, `ph`
- - would follow the actions of the daisy-chained component, creating useless
- - signal changes in the FPGA. Furthermore, the case for `i` = 10 is handled
- - specially because it is a wait period rather than a command.
+ - send to LT24.lt24.
  -
- - `i` = 12 is simply waiting for the last command to complete.
+ - When `i` reaches 13, initialisation is done. The way `i` = 13 is
+ - special-cased in the next-state expression means that the state is quiescent
+ - once reaching completion. If it were not special-cased, `ph` would follow
+ - the actions of the daisy-chained component, creating useless signal changes
+ - in the FPGA.
+ -
+ - `i` = 10 is handled specially because it is a wait period rather than a
+ - command, and `i` = 12 is simply waiting for the last command to complete.
  -
  - 'ph' indicates the phase of command acceptance by LT24.lt24, tracking the
  - `ready` signal.
@@ -50,7 +52,7 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
     where
         (action, lt24din, ready_daisy)
             = case i of
-                11 -> (action_daisy, lt24din_daisy, ready)
+                13 -> (action_daisy, lt24din_daisy, ready)
                 _  -> (my_action   , my_lt24din   , True )
         (my_action, my_lt24din) = initLt24'' (i, si)
         ip = i + 1
@@ -69,7 +71,8 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       ( _, _ ) -> (ip, 0  )
         (i', si', ph') = case (i, ph, ready) of
                            (13, _, _    ) -> (i , si , ph)
-                           (10, _, _    ) -> (ni, nsi, L)
+                           (12, _, True ) -> (ni, nsi, ph)
+                           (10, _, _    ) -> (ni, nsi, L )
                            (_ , L, False) -> (ni, nsi, H )
                            (_ , H, True ) -> (i , si , L )
                            _              -> (i , si , ph)
@@ -92,7 +95,7 @@ initLt24'' ( 8, b) = (LT24.Write  , (resize
                                     . pal5bTo6b
                                     . resize)   b) -- Blue
 initLt24'' ( 9, _) = (LT24.Command, cSLPOUT      )
-initLt24'' (10, _) = (LT24.NOP    , 0            )
+initLt24'' (10, _) = (LT24.NOP    , 65280        )
 initLt24'' (11, _) = (LT24.Command, cDISPON      )
 initLt24'' ( _, _) = (LT24.NOP    , 0            )
 
