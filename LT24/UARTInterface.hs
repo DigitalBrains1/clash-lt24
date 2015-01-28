@@ -7,6 +7,7 @@ import qualified LT24.LT24 as LT24
 import LT24.Init
 import qualified Toolbox.Serial as Serial
 import qualified Toolbox.ClockScale as CS
+import qualified Toolbox.FIFO as FIFO
 import Toolbox.FClk
 
 {-
@@ -53,26 +54,28 @@ import Toolbox.FClk
  - 2 -> LT24.Write
  - 3 -> LT24.ReadFM
  - 4 -> LT24.ReadID
+ - 5 -> Hold FIFO; commands are queued until the FIFO is released
+ - 6 -> Release FIFO; execute the queued commands as quickly as possible
+ - 7 -> GPIO: set GPIO outputs, read GPIO inputs
  -}
 
---intfBare = intf LT24.lt24
+intfBare = intf LT24.lt24
 
 {-
  - Create an UART interface, resetting the LT24 on powerup / reset
  -}
---intfInited = intf lt24WithInit
-intfInited = intf
+intfInited = intf lt24WithInit
 
-intf i = o
+intf lt24 i = o
     where
         o = ((combineOutput <$>) . pack)
-              (trigger, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
 
         rxd = vhead <$> i
         ltdin = (fromBV . vtail) <$> i
 
-        (trigger, ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
-            lt24WithInit (action, din, ltdin)
+        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+            lt24 (action, din, ltdin)
 
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
                   sCmd
@@ -81,7 +84,8 @@ intf i = o
                   (signal CS.Run)
         (rxoF, rxoV) = Serial.input (rTick, rxd)
 
-        (txiV, txi, action, din) = commandIf (rxoF, rxoV, txDone, ready, dout)
+        (txiV, txi, action, din, gpioO)
+            = commandIf (rxoF, rxoV, txDone, ready, dout)
 
 {-
  - Because CλaSH components should have a single input and a single output
@@ -90,25 +94,40 @@ intf i = o
  - topEntity are combined into a bitvector. The VHDL wrapper then untangles the
  - vector.
  -}
-combineOutput (trigger, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
-    = ((trigger :> txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+combineOutput (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = ((gpioO :> txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
 -- Command interface
-commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din)
+commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din, gpioO)
     where
         (rxoFE, rxo) = unpack rxoF
 
         rxVec = (groupBytes <^> (vcopyI 0)) (rxo, rxoV)
         cValid = (countBytes <^> 2) rxoV
 
-        (action, din) = (passCommand <^> (PCIdle, LT24.NOP, 0))
-                          (rxC, rxDW, cValid, ready)
+        (_, cFifoEmpty, _, cFifoO)
+            = (FIFO.fifo <^> (0, 0, vcopy d16 (0, 0)))
+                (cFifoI, cFifoWr, cFifoRd)
+        cFifoI = pack (rxC, rxDW)
+        (cFifoEn, cFifoWr) = (managFIFO <^> True) (rxC, cValid)
+        doCmd = (((\(cFifoEmpty, cFifoEn) -> cFifoEn && not cFifoEmpty) <$>)
+                 . pack) (cFifoEmpty, cFifoEn)
+
+        (cFifoOCmd, cFifoOD) = unpack cFifoO
+        (action, din, gpioO, cFifoRd)
+            = (passCommand <^> (PCIdle, 0, 0, L))
+                (cFifoOCmd, cFifoOD, doCmd, ready)
 
         (rxC, rxDW) = (unpack . (splitRxVec <$>) . pack) rxVec
 
-        (txi, txiV) = (returnData <^> RDState 0 0 0 0)
-                        (txDone, rxC, rxDW, ready, dout)
+        (_, rFifoEmpty, _, rFifoO)
+            = (FIFO.fifo <^> (0, 0, vcopy d64 (0, 0)))
+                (rFifoI, rFifoWr, rFifoRd)
+        (rFifoI, rFifoWr) = (returnData <^> RDState 0 0 0)
+                              (cFifoOCmd, cFifoOD, ready, dout)
+        (txi, txiV, rFifoRd) = (serResp <^> (0 :: Unsigned 2))
+                                 (rFifoO, rFifoEmpty, txDone)
 
 splitRxVec i = (cmd, d)
     where
@@ -132,6 +151,12 @@ countBytes s True  = (s', False)
     where
         s' = s - 1
 
+--        fifoEn (rxC, cValid) = (fifoEn', (fifoEn', fifoWr))
+managFIFO fifoEn (rxC, False ) = (fifoEn , (fifoEn , False ))
+managFIFO _      (  5, True  ) = (False  , (False  , False ))
+managFIFO _      (  6, True  ) = (True   , (True   , False ))
+managFIFO fifoEn (  _, True  ) = (fifoEn , (fifoEn , True  ))
+
 data PCState = PCIdle | PCWaitAccept | PCWaitReady
 
 {-
@@ -142,120 +167,114 @@ data PCState = PCIdle | PCWaitAccept | PCWaitReady
  - to signal acceptance and then completion.
  -}
 
-passCommand :: (PCState, LT24.Action, Unsigned 16)
+passCommand :: (PCState, Unsigned 8, Unsigned 16, Bit)
             -> (Unsigned 8, Unsigned 16, Bool, Bool)
-            -> ((PCState, LT24.Action, Unsigned 16), (LT24.Action, Unsigned 16))
+            -> ( (PCState, Unsigned 8, Unsigned 16, Bit)
+               , (LT24.Action, Unsigned 16, Bit, Bool))
 
---            (PCState      , cbuf, dbuf) (cmd, d, cValid, ready )
-passCommand s@(PCIdle       , cbuf, dbuf) (cmd, d, False , ready )
-    = (s , (cbuf, dbuf))
-passCommand   (PCIdle       , cbuf, dbuf) (cmd, d, True  , ready )
-    = (s', (cbuf', d  ))
+passCommand (st, cbuf, dbuf, gpioOB) (cmd, d, doCmd, ready)
+    = ( (st', cbuf', dbuf', gpioO) , (action, din, gpioO, fifoRd))
     where
-        s' = (PCWaitAccept, cbuf', d)
-        cbuf' = case cmd of
-                    0 -> LT24.Reset
-                    1 -> LT24.Command
-                    2 -> LT24.Write
-                    3 -> LT24.ReadFM
-                    4 -> LT24.ReadID
-                    _ -> LT24.NOP
+        (st', cbuf', dbuf', gpioO, fifoRd)
+            = passCommand' st cbuf dbuf gpioOB cmd d doCmd ready
+        action = case cbuf' of
+                   0 -> LT24.Reset
+                   1 -> LT24.Command
+                   2 -> LT24.Write
+                   3 -> LT24.ReadFM
+                   4 -> LT24.ReadID
+                   _ -> LT24.NOP
+        din = dbuf'
 
-passCommand s@(PCWaitAccept , cbuf, dbuf) (cmd, d, cValid, True )
-    = (s , (cbuf , dbuf))
+--           PCState      cbuf dbuf gpioOB cmd d doCmd ready
+--    (PCState'    , cbuf', dbuf', gpioO , fifoRd)
+passCommand' PCIdle       cbuf dbuf gpioOB cmd d False ready
+    = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
-passCommand   (PCWaitAccept , cbuf, dbuf) (cmd, d, cValid, False)
-    = (s', (cbuf', dbuf))
+
+passCommand' PCIdle       cbuf dbuf gpioOB 7   d True  ready
+    = (PCIdle      , cbuf , dbuf , gpioO , True  )
     where
-        s' = (PCWaitReady, cbuf', dbuf)
-        cbuf' = LT24.NOP
+        gpioO = vexact d0 (toBV d)
 
-passCommand s@(PCWaitReady , cbuf, dbuf) (cmd, d, cValid, False)
-    = (s , (cbuf , dbuf))
+passCommand' PCIdle       cbuf dbuf gpioOB cmd d True  ready
+    = (PCWaitAccept, cmd  , d    , gpioOB, True  )
 
-passCommand   (PCWaitReady , cbuf, dbuf) (cmd, d, cValid, True )
-    = (s', (cbuf , dbuf))
-    where
-        s' = (PCIdle, cbuf, dbuf)
+passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d doCmd True
+    = (PCWaitAccept, cbuf , dbuf , gpioOB, False )
+
+passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d False False
+    = (PCWaitReady , 255  , dbuf , gpioOB, False )
+
+passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d True  False
+    = (PCWaitReady , cmd  , d    , gpioOB, False )
+
+passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d doCmd False
+    = (PCWaitReady , cbuf , dbuf , gpioOB, False )
+
+passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d True  True
+    = (PCWaitAccept, cbuf , dbuf , gpioOB, True  )
+
+passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d False True
+    = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
 data RDState = RDState
-    { rdMode :: Unsigned 3
-    , rxCBuf :: Unsigned 8
-    , rxDWBuf :: Unsigned 16
-    , doutBuf :: Unsigned 16
+    { rdMode :: Unsigned 1
+    , cmdBuf :: Unsigned 8
+    , cmdDBuf :: Unsigned 16
     }
 
-{- Return a response to the PC
- -
- - Waits for command completion, 
- -
- - The whole thing is paced by txDone (which indicates a byte has been sent/can
- - be sent to the PC).
- -
- - Output: (txi, txiV) inputs to Serial.output: byte to be transmitted, byte
- - valid if `txiV` is True.
+{-
+ - Return a response to the PC
  -}
 returnData :: RDState
-           -> (Bool, Unsigned 8, Unsigned 16, Bool, Unsigned 16)
-           -> (RDState, (Unsigned 8, Bool))
-
---           (txDone, rxC, rxDW, ready, dout)
-returnData s (False , rxC, rxDW, ready, dout) = (s, (0, False))
-returnData s (True  , rxC, rxDW, ready, dout)
-    = returnData' s (rxC, rxDW, ready, dout)
+           -> (Unsigned 8, Unsigned 16, Bool, Unsigned 16)
+           -> (RDState, ((Unsigned 8, Unsigned 16), Bool))
 
 {- Template
-returnData' s@(RDState { rdMode = 0 }) (rxC, rxDW, ready, dout) =
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, ready, dout) =
+    (s'               , (0 , 0 ), False ))
  -}
 
+--         s                          (cmd, cmdD, ready, dout)
+--  (s'               , (rc, rd), fifoWr))
 -- Idle, capture inputs
-returnData' s@(RDState { rdMode = 0 }) (rxC, rxDW, True , dout) =
-    (s'              , (0  , False))
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, True , dout) =
+    (s'              , ((0 , 0 ), False ))
     where
-        s' = RDState 0 rxC rxDW (doutBuf s)
+        s' = RDState 0 cmd cmdD
 
 -- Start of command
-returnData' s@(RDState { rdMode = 0 }) (rxC, rxDW, False, dout) =
-    (s { rdMode = 1 }, (0, False))
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, False, dout) =
+    (s { rdMode = 1 }, ((0 , 0 ), False ))
 
 -- Wait for command completion
-returnData' s@(RDState { rdMode = 1 }) (rxC, rxDW, False, dout) =
-    (s               , (0  , False))
+returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, False, dout) =
+    (s               , ((0 , 0 ), False ))
 
 -- Report on command completion
-returnData' s@(RDState { rdMode = 1 }) (rxC, rxDW, True , dout) =
-    (s'              , (d  , True ))
+returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, True , dout) =
+    (s { rdMode = 0 }, ((rc, rd), True  ))
     where
-        d = rxCBuf s
-        s' = s { rdMode = mode', doutBuf = dout }
-        mode' = case d of
-                  -- Read commands: return data
-                  3 -> 2
-                  4 -> 2
-                  -- Echo arguments
-                  _ -> 4
+        rc = cmdBuf s
+        rd = case rc of
+               -- Read data
+               3 -> dout
+               4 -> dout
+               -- Echo request
+               _ -> cmdDBuf s
+--      s ((rc, rd), rFifoEmpty, txDone) = (s', (txi, txiV , rFifoRd))
 
--- Send doutBuf LSB
-returnData' s@(RDState { rdMode = 2 }) (rxC, rxDW, ready, dout) =
-    (s { rdMode = 3 }, (d  , True ))
+serResp s ((rc, rd), _         , False ) = (s , (0  , False, False  ))
+serResp s ((rc, rd), True      , _     ) = (0 , (0  , False, False  ))
+serResp s ((rc, rd), False     , True  ) = (s', (txi, True , rFifoRd))
     where
-        d = resize $ doutBuf s
-
--- Send doutBuf MSB
-returnData' s@(RDState { rdMode = 3 }) (rxC, rxDW, ready, dout) =
-    (s { rdMode = 0 }, (d  , True ))
-    where
-        d = resize $ doutBuf s `shiftR` 8
-
--- Send rxDWBuf LSB
-returnData' s@(RDState { rdMode = 4 }) (rxC, rxDW, ready, dout) =
-    (s { rdMode = 5 }, (d  , True ))
-    where
-        d = resize $ rxDWBuf s
-
--- Send rxDWBuf MSB
-returnData' s@(RDState { rdMode = 5 }) (rxC, rxDW, ready, dout) =
-    (s { rdMode = 0 }, (d  , True ))
-    where
-        d = resize $ rxDWBuf s `shiftR` 8
+        s' = case s of
+               2 -> 0
+               _ -> s + 1
+        txi = case s of
+                0 -> rc
+                1 -> resize rd
+                _ -> resize $ rd `shiftR` 8
+        rFifoRd = s == 2
 
