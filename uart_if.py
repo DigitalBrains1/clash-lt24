@@ -25,10 +25,10 @@ class UartIf(object):
 
     def read_reply(self, exp_c, exp_d = None):
         r = self.ser.read(3)
+        print('< {}'.format(codecs.encode(r, 'hex_codec')))
         if len(r) != 3:
             print('Connection dropped!', file=sys.stderr)
             raise Exception()
-        print('< {}'.format(codecs.encode(r, 'hex_codec')))
         c, d = struct.unpack(b'<BH', r)
         if c != exp_c or (exp_d is not None and d != exp_d):
             print(('Response error: expected {}:{}, got {}:{}'
@@ -60,6 +60,7 @@ class UartIf(object):
 
     def run(self):
         self.ser = serial.Serial('/dev/ttyUSB0', 115200)
+        self.ser.timeout = 0.1
 
     def trivial_palette(self):
         self.lt24_command(self.RGBSET)
