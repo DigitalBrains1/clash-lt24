@@ -63,7 +63,7 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       ( 6, _ ) -> (i , sip)
                       ( 7, 63) -> (ip, 0  )
                       ( 7, _ ) -> ( i, sip)
-                      ( 8, 31) -> (ip, 0  )
+                      ( 8, 31) -> (12, 0  )
                       ( 8, _ ) -> (i , sip)
                       (10, $(litP $ integerL
                              $ $(CS.ticksMinPeriod fClk 120e-3)))
@@ -97,7 +97,7 @@ initLt24'' ( 8, b) = (LT24.Write  , (resize
                                     . pal5bTo6b
                                     . resize)   b) -- Blue
 initLt24'' ( 9, _) = (LT24.Command, cSLPOUT      )
-initLt24'' (10, _) = (LT24.NOP    , 65280        )
+initLt24'' (10, _) = (LT24.NOP    , 0            )
 initLt24'' (11, _) = (LT24.Command, cDISPON      )
 initLt24'' ( _, _) = (LT24.NOP    , 0            )
 
