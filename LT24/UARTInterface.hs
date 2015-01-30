@@ -116,7 +116,7 @@ commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din, gpioO)
 
         (cFifoOCmd, cFifoOD) = unpack cFifoO
         (action, din, gpioO, cFifoRd)
-            = (passCommand <^> (PCIdle, 0, 0, L))
+            = (passCommand <^> (PCIdle, 255, 0, L))
                 (cFifoOCmd, cFifoOD, doCmd, ready)
 
         (rxC, rxDW) = (unpack . (splitRxVec <$>) . pack) rxVec
