@@ -122,10 +122,10 @@ commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din, gpioO)
         (rxC, rxDW) = (unpack . (splitRxVec <$>) . pack) rxVec
 
         (_, rFifoEmpty, _, rFifoO)
-            = (FIFO.fifo <^> (0, 0, vcopy d64 (0, 0)))
+            = (FIFO.fifo <^> (0, 0, vcopy d16 (0, 0)))
                 (rFifoI, rFifoWr, rFifoRd)
         (rFifoI, rFifoWr) = (returnData <^> RDState 0 0 0)
-                              (cFifoOCmd, cFifoOD, ready, dout)
+                              (cFifoOCmd, cFifoOD, cFifoRd, ready, dout)
         (txi, txiV, rFifoRd) = (serResp <^> (0 :: Unsigned 2))
                                  (rFifoO, rFifoEmpty, txDone)
 
@@ -228,32 +228,41 @@ data RDState = RDState
  - Return a response to the PC
  -}
 returnData :: RDState
-           -> (Unsigned 8, Unsigned 16, Bool, Unsigned 16)
+           -> (Unsigned 8, Unsigned 16, Bool, Bool, Unsigned 16)
            -> (RDState, ((Unsigned 8, Unsigned 16), Bool))
 
 {- Template
-returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, ready, dout) =
-    (s'               , (0 , 0 ), False ))
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, cFifoRd, ready, dout) =
+    (s                , (0 , 0 ), False ))
  -}
 
---         s                          (cmd, cmdD, ready, dout)
---  (s'               , (rc, rd), fifoWr))
--- Idle, capture inputs
-returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, True , dout) =
-    (s'              , ((0 , 0 ), False ))
+--         s                          (cmd, cmdD, cFifoRd, ready, dout)
+--  (s'               , (rc, rd), rFifoWr))
+
+-- Idle
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, False  , ready, dout) =
+    (s               , ((0 , 0 ), False  ))
+
+-- Read GPIO command (no inputs yet)
+returnData s@(RDState { rdMode = 0 }) (7  , cmdD, True   , ready, dout) =
+    (s               , ((7 , 0 ), True   ))
+
+-- Start of command; capture command
+returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, True   , ready, dout) =
+    (s'              , ((0 , 0 ), False  ))
     where
-        s' = RDState 0 cmd cmdD
+        s' = RDState 1 cmd cmdD
 
--- Start of command
-returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, False, dout) =
-    (s { rdMode = 1 }, ((0 , 0 ), False ))
-
--- Wait for command completion
-returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, False, dout) =
+-- Wait for command acceptance
+returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, cFifoRd, True , dout) =
     (s               , ((0 , 0 ), False ))
+returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, cFifoRd, False, dout) =
+    (s { rdMode = 2 }, ((0 , 0 ), False ))
 
--- Report on command completion
-returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, True , dout) =
+--Wait for command completion (rdMode = 2)
+returnData s                          (cmd, cmdD, cFifoRd, False, dout) =
+    (s               , ((0 , 0 ), False ))
+returnData s                          (cmd, cmdD, cFifoRd, True , dout) =
     (s { rdMode = 0 }, ((rc, rd), True  ))
     where
         rc = cmdBuf s
@@ -263,8 +272,8 @@ returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, True , dout) =
                4 -> dout
                -- Echo request
                _ -> cmdDBuf s
---      s ((rc, rd), rFifoEmpty, txDone) = (s', (txi, txiV , rFifoRd))
 
+--      s ((rc, rd), rFifoEmpty, txDone) = (s', (txi, txiV , rFifoRd))
 serResp s ((rc, rd), _         , False ) = (s , (0  , False, False  ))
 serResp s ((rc, rd), True      , _     ) = (0 , (0  , False, False  ))
 serResp s ((rc, rd), False     , True  ) = (s', (txi, True , rFifoRd))
