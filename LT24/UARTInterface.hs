@@ -212,6 +212,11 @@ passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d True  False
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d doCmd False
     = (PCWaitReady , cbuf , dbuf , gpioOB, False )
 
+passCommand' PCWaitReady  cbuf dbuf gpioOB 7   d True  True
+    = (PCWaitReady , cbuf , dbuf , gpioO , True  )
+    where
+        gpioO = vexact d0 (toBV d)
+
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d True  True
     = (PCWaitAccept, cbuf , dbuf , gpioOB, True  )
 
@@ -219,7 +224,7 @@ passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d False True
     = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
 data RDState = RDState
-    { rdMode :: Unsigned 1
+    { rdMode :: Unsigned 2
     , cmdBuf :: Unsigned 8
     , cmdDBuf :: Unsigned 16
     }
@@ -243,7 +248,7 @@ returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, cFifoRd, ready, dout) =
 returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, False  , ready, dout) =
     (s               , ((0 , 0 ), False  ))
 
--- Read GPIO command (no inputs yet)
+-- Read GPIO command (no inputs defined yet, so constant 0)
 returnData s@(RDState { rdMode = 0 }) (7  , cmdD, True   , ready, dout) =
     (s               , ((7 , 0 ), True   ))
 
