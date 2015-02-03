@@ -8,16 +8,18 @@ module Toolbox.ClockScale
        ( rateParams
        , State(..)
        , avg
-       , max
+       , clkDiv
        , staticAvg
        , staticAvgRate
-       , staticMax
+       , staticClkDiv
        , staticMaxRate
        , ticksMinPeriod
+       , ticksMinPeriodTH
        , ticksMaxRate
+       , ticksMaxRateTH
+       , nonNeg
        ) where
 
-import Prelude hiding (max)
 import Language.Haskell.TH
 import CLaSH.Prelude
 import Toolbox.Misc
@@ -33,7 +35,7 @@ instance Pack State where
  -
  - This is not meant to be compiled to VHDL; instead, use it to create the
  - parameters and use those parameters directly in the design. An example of
- - this is the convenient "staticRate" function in this module that can be
+ - this is the convenient "staticAvgRate" function in this module that can be
  - instantiated with Template Haskell.
  -}
 
@@ -57,7 +59,7 @@ data State = Stop | Run | Clear
  - Inputs: m - Multiplier for the system clock d - Divisor for the target clock
  -
  - The counter never goes to 0; it is most accurate when initialised to 1.
- - 
+ -
  - Make sure the target clock is lower than the system clock, or you will miss
  - ticks. Not surprising, really :).
  -
@@ -91,30 +93,19 @@ avg s (m, d, cmd) = (s', o)
                  sinc
         o    = wrap
 
-{-
- - Scale a clock frequency, not exceeding the given bound
+{- Divide the clock by an integer ratio
  -
- - Where `avg` tries to approximate the desired frequency as closesly as
- - possible and might cause a short pulse to compensate for a long pulse, this
- - implementation makes sure not to exceed the target frequency. Thus it is
- - more suited to clock signals to peripherals that have minimum allowed
- - periods.
- -
- - For more documentation, see `avg`.
- -
- - TODO: This is overly complicated; multiplier is completely superfluous if
- - you are going to round off anyway!
+ - See `avg` for more documentation.
  -}
 
-max :: (KnownNat n, KnownNat (n+1))
-    => Unsigned (n+1)
-    -> (Unsigned n, Unsigned n, State)
-    -> (Unsigned (n+1), Bool)
+clkDiv :: KnownNat n
+       => Unsigned n
+       -> (Unsigned n, State)
+       -> (Unsigned n, Bool)
 
-max s (m, d, cmd) = (s', o)
+clkDiv s (d, cmd) = (s', o)
     where
-        sinc = s + resize m
-        wrap = s >= resize d
+        wrap = s >= d
         s'   = if cmd == Clear then
                  1
                else if wrap then
@@ -122,7 +113,7 @@ max s (m, d, cmd) = (s', o)
                else if cmd == Stop then
                  s
                else
-                 sinc
+                 s + 1
         o    = wrap
 
 {-
@@ -133,9 +124,7 @@ max s (m, d, cmd) = (s', o)
  -}
 
 staticAvg (m, d) = appE (appE [| staticAvg' |] (fitU m)) (fitU d)
-
-staticMax (m, d) = appE (appE [| staticMax' |] (fitU m)) (fitU d)
-
+staticClkDiv d = appE [| staticClkDiv' |] (fitU d)
 
 {-
  - Through Template Haskell, instantiate a clock scaler that converts clock
@@ -145,13 +134,54 @@ staticMax (m, d) = appE (appE [| staticMax' |] (fitU m)) (fitU d)
 
 staticAvgRate from to = staticAvg $ rateParams from to
 
-staticMaxRate from to = staticMax $ rateParams from to
-
 {-
- - Through Template Haskell, instantiate a clock scaler that outputs a constant clock rate that has at least period `p`. 
+ - Through Template Haskell, instantiate a clock divider that never exceeds the
+ - rate `to`.
+ -
+ - `staticAvgRate` can temporarily exceed the given rate (by one clock tick) to
+ - compensate for time lost. `staticMaxRate` however will never do that, but
+ - this means it will run slow if the target rate does not evenly divide the
+ - clock frequency.
  -}
 
-staticMinPeriod fclk p = staticMax $ rateParams fclk $ truncate (1 / p)
+staticMaxRate from to = staticClkDiv $ ticksMaxRate from to
+
+{-
+ - Compute how many clock ticks need to pass before a certain period of time is
+ - reached.
+ -
+ - `f` is the clock frequency, `p` the period.
+ -}
+
+ticksMinPeriod f p = ceiling $ (fromInteger f) * p - 1
+
+-- Shorthand for Template Haskell instantiation
+
+ticksMinPeriodTH f p = intLit $ ticksMinPeriod f p
+
+{-
+ - Compute which clock divider approximates the given rate as closely as
+ - possible without exceeding it
+ -}
+
+ticksMaxRate from to = ticksMinPeriod from (1 / to)
+
+-- Shorthand for Template Haskell instantiation
+
+ticksMaxRateTH from to = intLit $ ticksMaxRate from to
+
+{- 
+ - When computing a delay in clock ticks, this function assures that when the
+ - result of the computation is negative, no delay is done (a delay of 0).
+ -
+ - Example: $(nonNeg $(ticksMinPeriod fClk 100e-9) - 4)
+ -   Computes the extra delay to have a total delay of 100 ns of which 4 clock
+ -   ticks have already been spent. If 4 clock ticks are more than 100 ns,
+ -   don't delay.
+ -}
+
+nonNeg = intLit . max 0
+
 
 staticAvg' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
               , KnownNat m)
@@ -160,18 +190,13 @@ staticAvg' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
            -> Unsigned (Max m n + 1)
            -> State
            -> (Unsigned (Max m n + 1), Bool)
+
 staticAvg' m d st cmd = avg st (resize m, resize d, cmd)
 
-staticMax' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
-              , KnownNat m)
-           => Unsigned n
-           -> Unsigned m
-           -> Unsigned (Max m n + 1)
-           -> State
-           -> (Unsigned (Max m n + 1), Bool)
-staticMax' m d st cmd = avg st (resize m, resize d, cmd)
+staticClkDiv' :: KnownNat n
+              => Unsigned n
+              -> Unsigned n
+              -> State
+              -> (Unsigned n, Bool)
 
-ticksMinPeriod f p = litE $ integerL $ ceiling $ (fromInteger f) * p - 1
-
-ticksMaxRate from to = ticksMinPeriod from (1 / to)
-
+staticClkDiv' d s cmd = clkDiv s (d, cmd)

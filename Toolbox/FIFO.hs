@@ -16,6 +16,11 @@ flowError = False
 
 type Pntr n = Unsigned (n + 1)
 
+{-
+ - This is the same FIFO implementation as from the CλaSH examples, with an
+ - added output: the number of elements in the FIFO can be examined. This could
+ - be useful for Dataflow elements that need multiple tokens to proceed.
+ -}
 fifo :: forall n e . (KnownNat n, KnownNat (n+1), KnownNat (2^n))
      => (Pntr n, Pntr n, Vec (2^n) e)
      -> (e, Bool, Bool)
@@ -45,3 +50,4 @@ fifo (rpntr, wpntr, elms) (datain, wrt, rd)
     full    = flength == bit n
 
     dataout = elms!rind
+

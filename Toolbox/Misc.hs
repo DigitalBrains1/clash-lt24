@@ -55,13 +55,12 @@ uToFit i = (appT (conT ''Unsigned)
 
 fitU :: Integer -> ExpQ
 
-fitU i = if i > toInteger (maxBound :: Unsigned 32) then
-             fail
-               (   "Clash cannot represent integer literals"
-                ++ " larger than 32 bits")
-         else
-            sigE (intLit i) (uToFit i)
+fitU i = sigE (intLit i) (uToFit i)
 
+{- Construct a vector from a list of signal names
+ - Example: $(vS ['s1, 's2, 's3]) is a vector of the three signals s1, s2 and
+ - s3.
+ -}
 vS :: [Name] -> ExpQ
 
 vS [] = [| pure Nil |]
@@ -84,6 +83,7 @@ vunzip4 xs = (as, bs, cs, ds)
         cs = vmap (\(a, b, c, d) -> c) xs
         ds = vmap (\(a, b, c, d) -> d) xs
 
+-- Output True when input changes
 edgeTrigger :: Eq a
             => a
             -> a

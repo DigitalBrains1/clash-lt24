@@ -8,11 +8,11 @@ module Simul.Common
 import qualified Text.Show.Pretty as Pr
 import CLaSH.Prelude
 
+-- Pretty print argument
 pretty :: Show a => a -> IO ()
 pretty = putStrLn . Pr.ppShow
 
-data EventList b = Ticks Int | Time Float | forall a. Set (a -> b) a
-                 | forall a. Pulse (a -> b) a | Infinity
+data EventList b = Ticks Int | Time Float | forall a. Set (a -> b) a | Infinity
 
 {-
  - Construct a list of inputs from a list of events
@@ -56,17 +56,10 @@ data EventList b = Ticks Int | Time Float | forall a. Set (a -> b) a
 
 eventList :: Real f => (c -> b -> c) -> f -> c -> [EventList b] -> [c]
 
-eventList tr f s es = eventList' tr f s s es
-
-eventList' :: Real f => (c -> b -> c) -> f -> c -> c -> [EventList b] -> [c]
-
-eventList' tr f s ns [] = []
-eventList' tr f s ns ((Set i v):es)
-    = eventList' tr f (tr s (i v)) (tr ns (i v)) es
-eventList' tr f s ns ((Pulse i v):es) = eventList' tr f (tr s (i v)) ns es
-eventList' tr f s ns ((Ticks n):es)
-    = (replicate n s) ++ eventList' tr f ns ns es
-eventList' tr f s ns ((Time t):es) = (replicate n s) ++ eventList' tr f ns ns es
+eventList tr f s [] = []
+eventList tr f s ((Set i v):es) = eventList tr f (tr s (i v)) es
+eventList tr f s ((Ticks n):es) = (replicate n s) ++ eventList tr f s es
+eventList tr f s ((Time t):es) = (replicate n s) ++ eventList tr f s es
     where
         n = ceiling (t * (fromRational . toRational) f)
-eventList' tr f s ns (Infinity:_) = repeat s
+eventList tr f s (Infinity:_) = repeat s

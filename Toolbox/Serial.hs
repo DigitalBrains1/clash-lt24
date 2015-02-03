@@ -103,7 +103,6 @@ input' s@(mode, wait, run, shift, sample) (cTick, dIn)
     = (s', ((frameErr, dOut), dValid))
     where
         s'@(mode', wait', run', shift', sample') = input'' s cTick dIn
-        --s' = (mode', wait', run', shift', sample')
         frameErr = vhead shift' == L
         dOut = fromBV $ vtail shift' :: Unsigned 8
         dValid = run && (not run')
@@ -153,6 +152,7 @@ input'' s@(WaitHigh , 0   , run  , shift, sample) _     H
 input''   (mode     , wait, run  , shift, sample) _     _
     = (mode, wait - 1, run, shift, sample)
 
+-- Initial state for input
 initInput :: (State, Unsigned 4, Bool, Vec 9 Bit, Unsigned 2)
 
 initInput = (WaitStart, 0, False, vcopyI L, 0)

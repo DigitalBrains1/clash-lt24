@@ -66,7 +66,7 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       ( 8, 31) -> (ip, 0  )
                       ( 8, _ ) -> (i , sip)
                       (10, $(litP $ integerL
-                             $ $(CS.ticksMinPeriod fClk 120e-3)))
+                             $ CS.ticksMinPeriod fClk 120e-3))
                                -> (ip, 0  )
 --                      (10, 123) -> (ip, 0)
                       (10, _ ) -> (i , sip)
@@ -80,7 +80,7 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                            _              -> (i , si , ph)
 
 initLt24'' :: ( Unsigned 4
-              , $(uToFit $ max $(CS.ticksMinPeriod fClk 120e-3) 63))
+              , $(uToFit $ max (CS.ticksMinPeriod fClk 120e-3) 63))
            -> (LT24.Action, Unsigned 16)
 
 initLt24'' ( 0, _) = (LT24.Reset  , 0            )

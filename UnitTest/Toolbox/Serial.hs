@@ -3,56 +3,14 @@
 module UnitTest.Toolbox.Serial
        ( module UnitTest.Toolbox.Serial
        , module Toolbox.Serial
-       , module Toolbox.FClk
        ) where
 
 import Control.Applicative
 import CLaSH.Prelude
-import Data.Char
 import qualified Toolbox.ClockScale as CS
 import qualified Toolbox.FIFO as FIFO
 import Toolbox.Serial
 import Toolbox.FClk
-
-outputTestInput delay1 delay2 =    take delay1 (repeat (False, undefined))
-                                ++ [ (True, 65) ] -- 01000001b
-                                ++ take delay2
-                                     (repeat (False, undefined))
-                                ++ [ (True, 66) ] -- 01000010b
-                                ++ repeat (False, undefined)
-
-testOutputC scale (ld, din) = txd
-    where
-        tick = (CS.avg <^> (0 :: Unsigned 27))
-                 (1, scale, scale_cmd)
-        (scale_cmd, done, txd) = output (tick, ld, din)
-
-testOutput :: Int -> Signal (Unsigned 26) -> [(Bool, Unsigned 8)]
-                  -> [Bit]
-
-testOutput time scale =   simulate (testOutputC scale . unpack)
-                        . (take time)
-
-
--- The name "testInput" is reserved, so add a C for Component
-testInputC :: [Bit]
-          -> [( (State, Unsigned 4, Bool, Vec 9 Bit, Unsigned 2)
-              , ((Bool, Unsigned 8), Bool))]
-
-testInputC =  simulate (pack . (testC <^> initInput) . unpack)
-           . map (\b -> (True, b))
-    where
-        testC s i = let (s', o) = input' s i in (s', (s', o))
-
-
-stringToTestInput :: String -> [Bit]
-
-stringToTestInput =  concat . concat
-                   . map (  map (take 16 . repeat) . (++ [H]) . (L:) . toList
-                          . vreverse . toBV
-                          . (fromIntegral :: Int -> Unsigned 8) . ord)
-
--- Actual designs for synthesis
 
 hallo = $(v [72 :: Unsigned 8,97,108,108,111,13,10])
 
@@ -69,6 +27,7 @@ halloRepeater s ck = (s',(ld, d))
         ld = ck
         d  = hallo!s
 
+-- Simply send "Hallo<CR><LF>" over and over on TxD
 halloTransmitter = txd
     where
         (ld, d)            = (halloRepeater <^> 6) done
@@ -76,6 +35,7 @@ halloTransmitter = txd
                                stCmd
         (stCmd, done, txd) = output (sTick, ld, d)
 
+-- Same, but using a FIFO
 halloTransmitterFIFO = txd
     where
         (full, empty, _, dout) = (    FIFO.fifo
@@ -87,6 +47,9 @@ halloTransmitterFIFO = txd
         sTick                  = ($(CS.staticAvgRate fClk 115200) <^> 1)
                                    stCmd
 
+{- Reads characters from RxD and echoes them on TxD, but bit 5 is inverted.
+ - This swaps case on alphabetics
+ -}
 echoSwapCase rxd = txd
     where
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)

@@ -1,0 +1,15 @@
+Here is code for testing aspects of modules, including files with a "topEntity"
+that can be used to create VHDL to test the code either in an FPGA or in a
+simulation tool such as QuestaSim. To that end, there are also CλaSH
+testbenches through the use of testInput and expectedOutput.
+
+While named "unit test", the tests cover more than just strictly one unit and
+are more generally targeted at code development.
+
+The hierarchical structure mimicks the root structure, with UnitTest as the
+top-level module. For example:
+
+X/Y.hs
+UnitTest/X/Y.hs    -- Tests for X.Y
+UnitTest/X/Y/Z.hs  -- Tests specific to some aspect Z of the module X.Y, often
+                      in the form of a topEntity.

@@ -1,0 +1,10 @@
+The Haskell files in this module contain code that is not to be included in
+synthesis. More specifically, often the modules here negatively impact
+CλaSH compilation or analysis. Some constructs cause CλaSH to fail to compile to VHDL even if the code is not referenced. And some pragma's cause error messages to be much less useful (IncoherentInstances, UndecidableInstances). Therefore, it's benificial to spearate this code and only include it when it is actually used.
+
+The hierarchical structure mimicks the root structure, with Simul as the
+top-level module. For example:
+
+X/Y.hs
+Simul/X/Y.hs    -- Simulation code for X.Y
+Simul/X/Y/Z.hs  -- Simulation code specific to some aspect Z of the module X.Y

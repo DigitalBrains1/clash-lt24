@@ -20,7 +20,7 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
 -- TODO: ltdout is apparently delayed too much
 -- TODO: Proper buffering to maximally shorten combinatorial path
 
-{- 
+{-
  - Interface to the LT24 LC-display
  -
  - Inputs:
@@ -87,7 +87,7 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  - pertaining to the controller state and settings.
  -
  - The backlight is always on and Chip Select is always active.
- - 
+ -
  - Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
  - to the 3-state output buffer.
  -}
@@ -103,10 +103,10 @@ lt24 (action, din, ltdin)
         wrx = register H wrxE
 
 lt24'1 :: ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-          , $(uToFit $(CS.ticksMinPeriod fClk 120e-3)))
+          , $(uToFit $(CS.ticksMinPeriodTH fClk 120e-3)))
        -> (Action, Unsigned 16, Unsigned 16)
        -> ( ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-            , $(uToFit $(CS.ticksMinPeriod fClk 120e-3)))
+            , $(uToFit $(CS.ticksMinPeriodTH fClk 120e-3)))
           , (Bool, Unsigned 16, Bit, Bit, Bit, Bit, Unsigned 16, Bit))
 
 lt24'1 s i = (s', (ready, dout, resx, dcx, wrx, rdx, ltdout, oe))
@@ -133,7 +133,7 @@ lt24'2 (is, wait) _ = (is, wait - 1)
 
 {- Template:
 lt24'3 (st     , dout, obuf) (action , din, ltdin) = ( (s'    , dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
+                                                     , $(CS.ticksMinPeriodTH fClk
                                                            355e-9))
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
@@ -149,63 +149,63 @@ lt24'3 (LTIdle , dout, obuf) (NOP    , _  , ltdin) = ( (LTIdle , dout , obuf')
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTIdle , dout, obuf) (Reset  , din, ltdin) = ( (LTReset, dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           10e-6))
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 10e-6))
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (L    , H   , H   , H   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTIdle , dout, obuf) (Command, din, ltdin) = ( (LTWrite, dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , L   , L   , H   , din    , H  )
 
 lt24'3 (LTIdle , dout, obuf) (Write  , din, ltdin) = ( (LTWrite, dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , L   , H   , din    , H  )
 
 lt24'3 (LTIdle , dout, obuf) (ReadFM , din, ltdin) = ( (LTRead , dout , obuf')
--- max $(CS.ticksMinPeriod fClk   355e-9) ($(CS.ticksMinPeriod fClk 355e-9) + 1)
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+-- max $(CS.ticksMinPeriodTH fClk   355e-9) ($(CS.ticksMinPeriodTH fClk 355e-9) + 1)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , L   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTIdle , dout, obuf) (ReadID , din, ltdin) = ( (LTRead , dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , L   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTReset, dout, obuf) (action , din, ltdin) = ( (LTIdle , dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           120e-3))
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 120e-3))
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , H   , ltdout , L  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTWrite, dout, obuf) (action , din, ltdin) = ( (LTIdle , dout , obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , dcx , H   , H   , ltdout , H  )
         (resx, dcx, wrx, rdx, ltdout, oe) = obuf
 
 lt24'3 (LTRead , dout, obuf) (action , din, ltdin) = ( (LTIdle , dout', obuf')
-                                                     , $(CS.ticksMinPeriod fClk
-                                                           355e-9) + 4)
+                                                     , $(CS.ticksMinPeriodTH
+                                                           fClk 355e-9) + 4)
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , H   , ltdout , L  )
