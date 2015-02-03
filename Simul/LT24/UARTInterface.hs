@@ -12,10 +12,25 @@ import LT24.UARTInterface
 import qualified LT24.LT24 as LT24
 
 simulateCommandIf :: [((Bool, Unsigned 8), Bool, Bool, Bool, Unsigned 16)]
-                  -> [(Bool, Unsigned 8, LT24.Action, Unsigned 16, Bit)]
+                  -> [( (Bool, Unsigned 8, LT24.Action, Unsigned 16, Bit)
+                      , ((Bool, Unsigned 8), Bool, Bool, Bool, Unsigned 16))]
 
-simulateCommandIf = simulate ( pack . commandIf . unpack)
+simulateCommandIf = (\i -> zip (simulate (pack . commandIf . unpack) i) i)
                   . (++ repeat ((False, 0), False, True, True, 0))
+
+data ELCI = RX (Unsigned 8) | RXV Bool | TXDone Bool | Ready Bool
+          | DOut (Unsigned 16)
+
+trELCI (rxoF, rxoV, txDone, ready, dout) (RX d          )
+    = ((False, d), rxoV , txDone , ready , dout )
+trELCI (rxoF, rxoV, txDone, ready, dout) (RXV rxoV'     )
+    = (rxoF      , rxoV', txDone , ready , dout )
+trELCI (rxoF, rxoV, txDone, ready, dout) (TXDone txDone')
+    = (rxoF      , rxoV , txDone', ready , dout )
+trELCI (rxoF, rxoV, txDone, ready, dout) (Ready ready'  )
+    = (rxoF      , rxoV , txDone , ready', dout )
+trELCI (rxoF, rxoV, txDone, ready, dout) (DOut dout'    )
+    = (rxoF      , rxoV , txDone , ready , dout')
 
 simulatePassCommand :: [(Unsigned 8, Unsigned 16, Bool, Bool)]
                     -> [( (LT24.Action, Unsigned 16, Bit, Bool)
