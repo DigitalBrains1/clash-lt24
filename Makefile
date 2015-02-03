@@ -12,7 +12,12 @@ endef
 
 $(foreach tgt,$(VHDL_TARGETS),$(eval $(call VHDL_template,$(tgt))))
 
-.PHONY: clean $(VHDL_TARGETS)
+check:
+	for t in $(foreach tgt, $(VHDL_TARGETS), $($(tgt)_TOP)); do \
+		clash $$t 2>&1; \
+	done | tee make.log
+
+.PHONY: clean check $(VHDL_TARGETS)
 
 clean:
 	find . -name '*.o' -type f -delete
