@@ -9,6 +9,7 @@ import serial
 
 class UartIf(object):
 
+    RDDST     = 0x09 # 8.2.4 Read Display Status (page 92)
     RDDMADCTL = 0x0B # 8.2.6 Read Display MADCTL (page 95)
     SLPOUT    = 0x11 # 8.2.12 Sleep Out (page 101)
     DISPON    = 0x29 # 8.2.19 Display ON (page 109)
@@ -18,22 +19,56 @@ class UartIf(object):
     MADCTL    = 0x36 # 8.2.29 Memory Access Control (page 127)
     COLMOD    = 0x3A # 8.2.33 Pixel Format Set (page 134)
 
+    def __init__(self):
+        # Non-negative when queueing commands; length of command queue
+        # -1 : Not queueing commands
+        self.buflen = -1
+        self.exc_on_error = True
+        self.autoflush = True
+
     def send_command(self, c, d):
+        if self.buflen >= 16:
+            if not self.autoflush:
+                print('Buffer full!')
+                if self.exc_on_error:
+                    raise Exception()
+                else:
+                    return
+            else:
+                print('Flushing')
+                self.lt24_release()
+                self.lt24_hold()
+        if self.buflen >= 0:
+            self.buflen += 1
         s = struct.pack('<BH', c, d)
         print('> {}'.format(codecs.encode(s, 'hex_codec')))
         self.ser.write(s)
 
-    def read_reply(self, exp_c, exp_d = None):
+    def read_reply_raw(self):
         r = self.ser.read(3)
         print('< {}'.format(codecs.encode(r, 'hex_codec')))
+        return r
+
+    def read_reply(self, exp_c = None, exp_d = None):
+        if self.buflen >= 0:
+            self.expbuf.append((exp_c, exp_d))
+            return
+        r = self.read_reply_raw()
         if len(r) != 3:
-            print('Connection dropped!', file=sys.stderr)
-            raise Exception()
+            print('Connection dropped!')
+            if self.exc_on_error:
+                raise Exception()
+            else:
+                return
         c, d = struct.unpack(b'<BH', r)
+        if exp_c is None:
+            return d
         if c != exp_c or (exp_d is not None and d != exp_d):
             print(('Response error: expected {}:{}, got {}:{}'
-                  ).format(exp_c, exp_d, c, d), file=sys.stderr)
-            raise Exception()
+                  ).format(exp_c, exp_d, c, d))
+            if self.exc_on_error:
+                raise Exception()
+            #raise Exception()
         return d
 
     def lt24_reset(self, data = 0):
@@ -56,6 +91,23 @@ class UartIf(object):
     def lt24_read_id(self, data = 0):
         self.send_command(4, data)
         d = self.read_reply(4)
+        return d
+
+    def lt24_hold(self, data = 0):
+        self.send_command(5, data)
+        self.buflen = 0
+        self.expbuf = list()
+
+    def lt24_release(self, data = 0):
+        self.buflen = -1
+        self.send_command(6, data)
+        for exp_c, exp_d in self.expbuf:
+            self.read_reply(exp_c, exp_d)
+        del self.expbuf
+
+    def lt24_gpio(self, data):
+        self.send_command(7, data)
+        d = self.read_reply(7)
         return d
 
     def run(self):
