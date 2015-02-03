@@ -165,6 +165,11 @@ data PCState = PCIdle | PCWaitAccept | PCWaitReady
  - Wait for 'cValid' indicating three bytes have been received from the PC.
  - Then pass the command and the data to LT24.lt24, and wait for that component
  - to signal acceptance and then completion.
+ -
+ - To get the quickest response when bursting data (which is useful for testing
+ - timings), back-to-back commands skip the Idle phase. However, this won't
+ - work for GPIO access because returnData would get confused. So in the case
+ - of a GPIO command, the state first goes back to Idle.
  -}
 
 passCommand :: (PCState, Unsigned 8, Unsigned 16, Bit)
@@ -206,6 +211,9 @@ passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d doCmd True
 passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d False False
     = (PCWaitReady , 255  , dbuf , gpioOB, False )
 
+passCommand' PCWaitAccept cbuf dbuf gpioOB 7   d True  False
+    = (PCWaitReady , 255  , dbuf , gpioOB, False )
+
 passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d True  False
     = (PCWaitReady , cmd  , d    , gpioOB, False )
 
@@ -213,9 +221,7 @@ passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d doCmd False
     = (PCWaitReady , cbuf , dbuf , gpioOB, False )
 
 passCommand' PCWaitReady  cbuf dbuf gpioOB 7   d True  True
-    = (PCWaitReady , cbuf , dbuf , gpioO , True  )
-    where
-        gpioO = vexact d0 (toBV d)
+    = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d True  True
     = (PCWaitAccept, cbuf , dbuf , gpioOB, True  )
