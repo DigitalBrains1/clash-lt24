@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module LT24.Palette where
 
 import CLaSH.Prelude

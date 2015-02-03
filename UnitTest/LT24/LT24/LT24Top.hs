@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module UnitTest.LT24.LT24.LT24Top where
 
 import CLaSH.Prelude

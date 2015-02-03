@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Simul.LT24.UARTInterface
        ( module Simul.LT24.UARTInterface
        , module Simul.Common

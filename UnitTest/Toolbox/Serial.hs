@@ -1,4 +1,6 @@
-{-# LANGUAGE DataKinds, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module UnitTest.Toolbox.Serial
        ( module UnitTest.Toolbox.Serial

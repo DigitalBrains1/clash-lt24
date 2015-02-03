@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Simul.LT24.LT24
        ( module Simul.LT24.LT24
        , module Simul.Common
