@@ -8,6 +8,7 @@ import CLaSH.Prelude
 import qualified Toolbox.ClockScale as CS
 import Toolbox.PackInstances
 import Toolbox.FClk
+import Toolbox.Misc
 
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
     deriving (Show, Eq)
@@ -102,10 +103,10 @@ lt24 (action, din, ltdin)
         wrx = register H wrxE
 
 lt24'1 :: ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-          , Unsigned 13)
+          , $(uToFit $(CS.ticksMinPeriod fClk 120e-3)))
        -> (Action, Unsigned 16, Unsigned 16)
        -> ( ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-            , Unsigned 13)
+            , $(uToFit $(CS.ticksMinPeriod fClk 120e-3)))
           , (Bool, Unsigned 16, Bit, Bit, Bit, Bit, Unsigned 16, Bit))
 
 lt24'1 s i = (s', (ready, dout, resx, dcx, wrx, rdx, ltdout, oe))
@@ -188,7 +189,7 @@ lt24'3 (LTIdle , dout, obuf) (ReadID , din, ltdin) = ( (LTRead , dout , obuf')
 
 lt24'3 (LTReset, dout, obuf) (action , din, ltdin) = ( (LTIdle , dout , obuf')
                                                      , $(CS.ticksMinPeriod fClk
-                                                           120e-6))
+                                                           120e-3))
     where
         --      (resx', dcx', wrx', rdx', ltdout', oe')
         obuf' = (H    , H   , H   , H   , ltdout , L  )
