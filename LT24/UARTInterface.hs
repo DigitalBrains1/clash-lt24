@@ -37,6 +37,17 @@ import Toolbox.FClk
  - Because responses echo parts of the request, communication issues are
  - hopefully often spotted and not wrongfully attributed to something else.
  -
+ - The command byte can be one of:
+ -
+ - 0 -> LT24.Reset
+ - 1 -> LT24.Command
+ - 2 -> LT24.Write
+ - 3 -> LT24.ReadFM
+ - 4 -> LT24.ReadID
+ - 5 -> Hold FIFO; up to 16 commands are queued until the FIFO is released
+ - 6 -> Release FIFO; execute the queued commands as quickly as possible
+ - 7 -> GPIO: set GPIO outputs, read GPIO inputs
+ -
  - Examples (> is data from PC to FPGA, < is data from FPGA to PC, all numbers
  - hexadecimal):
  -
@@ -46,17 +57,14 @@ import Toolbox.FClk
  - < 01 2C 00       - LT24.Command completed; echoing value cRAMWR
  - > 03 34 12       - Read frame memory; dummy data ignored
  - < 03 EF BE       - Data from frame memory: 0xBEEF
- -
- - The command byte can be one of:
- -
- - 0 -> LT24.Reset
- - 1 -> LT24.Command
- - 2 -> LT24.Write
- - 3 -> LT24.ReadFM
- - 4 -> LT24.ReadID
- - 5 -> Hold FIFO; commands are queued until the FIFO is released
- - 6 -> Release FIFO; execute the queued commands as quickly as possible
- - 7 -> GPIO: set GPIO outputs, read GPIO inputs
+ - > 07 01 00       - Set the "GPIO" output line high (supports up to 32)
+ - < 07 00 00       - Returns the GPIO inputs; none yet, so always 0
+ - > 05 00 00       - Hold commands (doesn't cause a response)
+ - > 01 2C 00       - LT24.Command: cRAMWR (no response yet; queued only)
+ - > 02 FE CA       - Write data: 0xCAFE (queued)
+ - > 06 00 00       - Release commands: the two queued commands are executed
+ - < 01 2C 00       - Response from LT24.Command
+ - < 02 FE CA       - Response from write data
  -}
 
 intfBare = intf LT24.lt24
@@ -237,6 +245,10 @@ data RDState = RDState
 
 {-
  - Return a response to the PC
+ -
+ - Monitors the command FIFO to catch the start of a command, and then monitors
+ - the `ready` line from LT24.lt24 to catch command completion and possibly a
+ - result on `dout`. Pushes the result on the response FIFO.
  -}
 returnData :: RDState
            -> (Unsigned 8, Unsigned 16, Bool, Bool, Unsigned 16)
@@ -297,6 +309,9 @@ returnData s                          (cmd, cmdD, False  , True , dout) =
                -- Echo request
                _ -> cmdDBuf s
 
+{-
+ - Serialize a response from the response FIFO to the serial port
+ -}
 --      s ((rc, rd), rFifoEmpty, txDone) = (s', (txi, txiV , rFifoRd))
 serResp s ((rc, rd), _         , False ) = (s , (0  , False, False  ))
 serResp s ((rc, rd), True      , _     ) = (0 , (0  , False, False  ))
