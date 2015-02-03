@@ -273,7 +273,20 @@ returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, cFifoRd, False, dout) =
 --Wait for command completion (rdMode = 2)
 returnData s                          (cmd, cmdD, cFifoRd, False, dout) =
     (s               , ((0 , 0 ), False ))
-returnData s                          (cmd, cmdD, cFifoRd, True , dout) =
+-- Back-to-back commands, capture next command and report current
+returnData s                          (cmd, cmdD, True   , True , dout) =
+    (s'              , ((rc, rd), True  ))
+    where
+        s' =RDState 1 cmd cmdD
+        rc = cmdBuf s
+        rd = case rc of
+               -- Read data
+               3 -> dout
+               4 -> dout
+               -- Echo request
+               _ -> cmdDBuf s
+
+returnData s                          (cmd, cmdD, False  , True , dout) =
     (s { rdMode = 0 }, ((rc, rd), True  ))
     where
         rc = cmdBuf s
