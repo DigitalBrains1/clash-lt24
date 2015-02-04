@@ -1,0 +1,54 @@
+[ { "BlackBox" :
+    { "name" : "Toolbox.Blockram2p.blockram2p'"
+    , "templateD" :
+"~SYM[0]_blockram2p_prime : block
+  signal ~SYM[1] : ~TYP[15];
+  signal ~SYM[2] : ~TYP[18];
+begin
+  ~SYM[3]_comp_inst : entity blockramwrapper
+    generic map (
+        address_reg_b => \"CLOCK0\",
+        clock_enable_input_a => \"BYPASS\",
+        clock_enable_input_b => \"BYPASS\",
+        clock_enable_output_a => \"BYPASS\",
+        clock_enable_output_b => \"BYPASS\",
+        indata_reg_b => \"CLOCK0\",
+        intended_device_family => \"Cyclone IV E\",
+        lpm_type => \"altsyncram\",
+        numwords_a => ~LIT[0],
+        numwords_b => ~LIT[1],
+        operation_mode => \"BIDIR_DUAL_PORT\",
+        outdata_aclr_a => \"NONE\",
+        outdata_aclr_b => \"NONE\",
+        outdata_reg_a => \"CLOCK0\",
+        outdata_reg_b => \"CLOCK0\",
+        power_up_uninitialized => \"FALSE\",
+        ram_block_type => \"M9K\",
+        read_during_write_mode_mixed_ports => \"OLD_DATA\",
+        read_during_write_mode_port_a => \"OLD_DATA\",
+        read_during_write_mode_port_b => \"OLD_DATA\",
+        widthad_a => ~LIT[2],
+        widthad_b => ~LIT[3],
+        width_a => ~LIT[4],
+        width_b => ~LIT[5],
+        width_byteena_a => 1,
+        width_byteena_b => 1,
+        wrcontrol_wraddress_reg_b => \"CLOCK0\"
+    )
+    port map (
+        clock0 => ~CLKO,
+        wren_a => ~ARG[16],
+        address_b => ~ARG[17],
+        data_b => ~ARG[18],
+        wren_b => ~ARG[19],
+        address_a => ~ARG[14],
+        data_a => ~ARG[15],
+        q_a => ~SYM[1],
+        q_b => ~SYM[2]
+   );
+  ~RESULT.~TYPO_sel0 <= ~SYM[1];
+  ~RESULT.~TYPO_sel1 <= ~SYM[2];
+end block;"
+    }
+  }
+]
