@@ -13,6 +13,8 @@ module Toolbox.Misc
        , vzip5
        , vunzip4
        , edgeTrigger
+       , tfold
+       , tfoldD
        ) where
 
 import Language.Haskell.TH
@@ -90,3 +92,30 @@ edgeTrigger :: Eq a
             -> (a, Bool)
 
 edgeTrigger s i = (i, s /= i)
+
+tfold :: Pack a
+      => (a -> a -> a)
+      -> a
+      -> SignalP (a, Bool)
+      -> SignalP a
+
+tfold f z = tfold' f z <^> z
+tfold' f z s (x1, start) = (s', s')
+    where
+        x0 | start     = z
+           | otherwise = s
+        s' = f x0 x1
+
+tfoldD :: Pack a
+       => (a -> a -> a)
+       -> a
+       -> SignalP (a, Bool)
+       -> SignalP a
+
+tfoldD f z = tfoldD' f z <^> z
+tfoldD' f z s (x1, start) = (s', s)
+    where
+        x0 | start     = z
+           | otherwise = s
+        s' = f x0 x1
+
