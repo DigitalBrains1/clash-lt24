@@ -17,17 +17,16 @@ blockram2p :: forall aaw baw aw bw .
            -> SNat baw
            -> SNat aw
            -> SNat bw
-           -> Signal ( Unsigned aaw, Unsigned aw, Bool, Unsigned baw
-                     , Unsigned bw, Bool)
-           -> Signal (Unsigned aw, Unsigned bw)
+           -> SignalP ( Unsigned aaw, Unsigned aw, Bool, Unsigned baw
+                      , Unsigned bw, Bool)
+           -> SignalP (Unsigned aw, Unsigned bw)
 
-blockram2p aaw baw aw bw i = o
+blockram2p aaw baw aw bw (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = (qA, qB)
     where
-         (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = unpack i
-         bp = withSNat (withSNat blockram2p') aaw baw aw bw
-                                      (aAddrB) (aDinB) aWrEnB
-                                      (bAddrB) (bDinB) bWrEnB
-         o = (((\(a,b) -> (fromBV a, fromBV b)) <$>) . pack) bp
+         (qAB, qBB) = withSNat (withSNat blockram2p') aaw baw aw bw
+                        (aAddrB) (aDinB) aWrEnB (bAddrB) (bDinB) bWrEnB
+         qA = fromBV <$> qAB
+         qB = fromBV <$> qBB
          aAddrB = toBV <$> aAddr
          aDinB = toBV <$> aDin
          aWrEnB = (\b -> if b then H else L) <$> aWrEn
