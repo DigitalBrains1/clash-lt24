@@ -3,6 +3,8 @@ module LT24.Commands where
 cRDDMADCTL :: Num a => a
 cSLPOUT :: Num a => a
 cDISPON :: Num a => a
+cCASET :: Num a => a
+cPASET :: Num a => a
 cRAMWR :: Num a => a
 cRGBSET :: Num a => a
 cRAMRD :: Num a => a

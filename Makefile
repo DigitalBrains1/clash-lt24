@@ -17,7 +17,7 @@ $(foreach tgt,$(VHDL_TARGETS),$(eval $(call VHDL_template,$(tgt))))
 
 check:
 	for t in $(foreach tgt, $(VHDL_TARGETS), $($(tgt)_TOP)); do \
-		clash $$t 2>&1; \
+		clash $$t 2>&1 || exit $?; \
 	done | tee make.log
 
 .PHONY: clean check $(VHDL_TARGETS)
