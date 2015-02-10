@@ -5,6 +5,7 @@ module UnitTest.LT24.Framebuffer.BouncyBall where
 
 import CLaSH.Prelude
 import Control.Applicative
+import Debug.Trace
 
 import qualified LT24.LT24 as LT24
 import LT24.Framebuffer
@@ -22,7 +23,8 @@ topEntity i = o
         ltdin = (fromBV . vtail) <$> i
 
         period = ($(CS.staticOneShotPeriod fClk 0.05) <^> 1) doUpdate
-        (x, y) = (ballPos <^> (0, 0, BpDown, BpRight)) doUpdate
+        doUpdateD = register False doUpdate
+        (x, y) = (ballPos <^> (0, 0, BpDown, BpRight)) doUpdateD
         (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
             = (drawBall <^> DbInitDisp 0) (x, y, accepted, period)
 
@@ -41,8 +43,8 @@ data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Unsigned 6) (Unsigned 6)
     deriving (Show, Eq)
 
 data DbI = DbI
-    { dbX :: Unsigned 6
-    , dbY :: Unsigned 6
+    { dbX :: Unsigned 8
+    , dbY :: Unsigned 9
     , dbAccepted :: Bool
     , dbPeriod :: Bool
     }
@@ -83,10 +85,11 @@ ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
         h' = case (h, y) of
                (BpLeft , 0  ) -> BpRight
                (BpRight, 256) -> BpLeft
-               _            -> h
+               _              -> h
         v' = case (v, x) of
                (BpUp  , 0  ) -> BpDown
                (BpDown, 192) -> BpUp
+               _             -> v
 
         x' = case v' of
                BpUp   -> x - 1
@@ -148,5 +151,5 @@ drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
 drawBall' s i = (s, dbO)
 
-theBall = vcopy d47 (vcopy d47 (0 :: Unsigned 2))
---theBall = $(pixelBallTH 23 5)
+--theBall = vcopy d47 (vcopy d47 (0 :: Unsigned 2))
+theBall = $(pixelBallTH 23 5)

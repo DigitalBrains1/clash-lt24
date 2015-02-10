@@ -1,4 +1,6 @@
-module CLaSHMain where
+module CLaSHMain
+       (topEntity
+       ) where
 
 import CLaSH.Prelude
 
