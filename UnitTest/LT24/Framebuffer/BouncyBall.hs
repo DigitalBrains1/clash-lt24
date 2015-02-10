@@ -85,12 +85,12 @@ drawBall' s@(DbInitDisp n) True
                   , (LT24.Write  , 0     )
                   , (LT24.Write  , 0     )
                   , (LT24.Write  , 0     )
-                  , (LT24.Write  , 46    )
+                  , (LT24.Write  , 47    )
                   , (LT24.Command, cPASET)
                   , (LT24.Write  , 0     )
                   , (LT24.Write  , 0     )
                   , (LT24.Write  , 0     )
-                  , (LT24.Write  , 46    )])
+                  , (LT24.Write  , 63    )])
         ad = adv!(9 - n)
 drawBall' s@(DbWriteRam x y ) _
     = ( s'
