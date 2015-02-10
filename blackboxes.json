@@ -2,8 +2,8 @@
     { "name" : "Toolbox.Blockram2p.blockram2p'"
     , "templateD" :
 "~SYM[0]_blockram2p_prime : block
-  signal ~SYM[1] : ~TYP[15];
-  signal ~SYM[2] : ~TYP[18];
+  signal ~SYM[1] : ~TYP[18];
+  signal ~SYM[2] : ~TYP[21];
 begin
   ~SYM[3]_comp_inst : entity blockramwrapper
     generic map (
@@ -37,12 +37,12 @@ begin
     )
     port map (
         clock0 => ~CLKO,
-        wren_a => ~ARG[16],
-        address_b => ~ARG[17],
-        data_b => ~ARG[18],
-        wren_b => ~ARG[19],
-        address_a => ~ARG[14],
-        data_a => ~ARG[15],
+        wren_a => ~ARG[19],
+        address_b => ~ARG[20],
+        data_b => ~ARG[21],
+        wren_b => ~ARG[22],
+        address_a => ~ARG[17],
+        data_a => ~ARG[18],
         q_a => ~SYM[1],
         q_b => ~SYM[2]
    );
