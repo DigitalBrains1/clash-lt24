@@ -16,6 +16,14 @@ import Toolbox.Misc
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
     deriving (Show, Eq)
 
+instance Lift Action where
+    lift NOP     = [| NOP |]
+    lift Reset   = [| Reset |]
+    lift Command = [| Command |]
+    lift Write   = [| Write |]
+    lift ReadFM  = [| ReadFM |]
+    lift ReadID  = [| ReadID |]
+
 data LTState = LTIdle | LTReset | LTRead | LTWrite
     deriving (Show, Eq)
 

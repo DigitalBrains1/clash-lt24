@@ -9,7 +9,9 @@ module LT24.Init
 import CLaSH.Prelude
 import Control.Applicative
 import Language.Haskell.TH
+
 import qualified LT24.LT24 as LT24
+import qualified Simul.LT24.DummyLT24 as DummyLT24
 import LT24.Commands
 import LT24.Palette (pal5bTo6b)
 import qualified Toolbox.ClockScale as CS
@@ -68,10 +70,10 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       ( 7, _ ) -> ( i, sip)
                       ( 8, 31) -> (ip, 0  )
                       ( 8, _ ) -> (i , sip)
-                      (10, $(litP $ integerL
-                             $ CS.ticksMinPeriod fClk 120e-3))
-                               -> (ip, 0  )
---                      (10, 123) -> (ip, 0)
+--                      (10, $(litP $ integerL
+--                             $ CS.ticksMinPeriod fClk 120e-3))
+--                               -> (ip, 0  )
+                      (10, 0 ) -> (ip, 0)
                       (10, _ ) -> (i , sip)
                       ( _, _ ) -> (ip, 0  )
         (i', si', ph') = case (i, ph, ready) of
@@ -115,4 +117,5 @@ lt24WithInit (action_daisy, din_daisy, ltdin)
     where
     (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
         = LT24.lt24 (action, din, ltdin)
+--        = DummyLT24.lt24 (action, din, ltdin)
     (action, din, ready_daisy) = initLt24 (ready, action_daisy, din_daisy)

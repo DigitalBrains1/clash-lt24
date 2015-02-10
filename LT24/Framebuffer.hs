@@ -1,7 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module LT24.Framebuffer where
+module LT24.Framebuffer
+       (framebuffer
+       ) where
 
 import CLaSH.Prelude
 import Control.Applicative
@@ -10,6 +12,7 @@ import qualified LT24.LT24 as LT24
 import LT24.Init (lt24WithInit)
 import LT24.Commands
 import Toolbox.Blockram2p
+--import Simul.Toolbox.Blockram2p
 import Toolbox.Misc
 
 framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
