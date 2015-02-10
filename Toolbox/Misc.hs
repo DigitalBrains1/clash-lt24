@@ -15,6 +15,7 @@ module Toolbox.Misc
        , edgeTrigger
        , tfold
        , tfoldD
+       , vv
        ) where
 
 import Language.Haskell.TH
@@ -119,3 +120,7 @@ tfoldD' f z s (x1, start) = (s', s)
            | otherwise = s
         s' = f x0 x1
 
+vv :: Lift a => [[a]] -> ExpQ
+
+vv []     = [| Nil |]
+vv (e:es) = [| $(v e) :> $(vv es) |]
