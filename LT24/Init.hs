@@ -70,10 +70,10 @@ initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
                       ( 7, _ ) -> ( i, sip)
                       ( 8, 31) -> (ip, 0  )
                       ( 8, _ ) -> (i , sip)
---                      (10, $(litP $ integerL
---                             $ CS.ticksMinPeriod fClk 120e-3))
---                               -> (ip, 0  )
-                      (10, 0 ) -> (ip, 0)
+                      (10, $(litP $ integerL
+                             $ CS.ticksMinPeriod fClk 120e-3))
+                               -> (ip, 0  )
+--                      (10, 0 ) -> (ip, 0)
                       (10, _ ) -> (i , sip)
                       ( _, _ ) -> (ip, 0  )
         (i', si', ph') = case (i, ph, ready) of
