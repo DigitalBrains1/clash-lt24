@@ -9,10 +9,13 @@ module Toolbox.ClockScale
        , State(..)
        , avg
        , clkDiv
+       , oneShot
        , staticAvg
-       , staticAvgRate
        , staticClkDiv
+       , staticOneShot
+       , staticAvgRate
        , staticMaxRate
+       , staticOneShotPeriod
        , ticksMinPeriod
        , ticksMinPeriodTH
        , ticksMaxRate
@@ -117,6 +120,30 @@ clkDiv s (d, cmd) = (s', o)
         o    = wrap
 
 {-
+ - When triggered, count to d once, then stop
+ -
+ - Outputs whether d has been reached yet. Most often used to make sure an
+ - amount of work does not take less time than counting to d: trigger when
+ - you start the work, and then wait for the oneShot to output True when the
+ - work is done. If the amount of work took more than the allotted time,
+ - this makes it continue immediately; otherwise it will wait.
+ -}
+oneShot :: KnownNat n
+        => Unsigned n
+        -> (Unsigned n, Bool)
+        -> (Unsigned n, Bool)
+
+oneShot s (d, trigger) = (s', done)
+    where
+        done = s >= d
+        s' = if trigger then
+               1
+             else if done then
+               d
+             else
+               s + 1
+
+{-
  - Instantiate a clock scaler with fixed parameters through Template Haskell
  -
  - The needed amount of bits in the state of the scaler is automatically
@@ -125,6 +152,12 @@ clkDiv s (d, cmd) = (s', o)
 
 staticAvg (m, d) = appE (appE [| staticAvg' |] (fitU m)) (fitU d)
 staticClkDiv d = appE [| staticClkDiv' |] (fitU d)
+
+{-
+ - Instantiate a oneShot with a fixed divider through Template Haskell
+ -}
+
+staticOneShot d = appE [| staticOneShot' |] (fitU d)
 
 {-
  - Through Template Haskell, instantiate a clock scaler that converts clock
@@ -147,8 +180,17 @@ staticAvgRate from to = staticAvg $ rateParams from to
 staticMaxRate from to = staticClkDiv $ ticksMaxRate from to
 
 {-
- - Compute how many clock ticks need to pass before a certain period of time is
- - reached.
+ - Instantiate a oneShot that waits for the specified period through
+ - Template Haskell
+ -
+ - `f` is the clock frequency, `p` the period.
+ -}
+
+staticOneShotPeriod f p = staticOneShot $ ticksMinPeriod f p
+
+{-
+ - Compute how many clock ticks need to pass before a certain period of time
+ - is reached
  -
  - `f` is the clock frequency, `p` the period.
  -}
@@ -193,10 +235,6 @@ staticAvg' :: ( KnownNat (Max m n), KnownNat (Max m n + 1), KnownNat n
 
 staticAvg' m d st cmd = avg st (resize m, resize d, cmd)
 
-staticClkDiv' :: KnownNat n
-              => Unsigned n
-              -> Unsigned n
-              -> State
-              -> (Unsigned n, Bool)
-
 staticClkDiv' d s cmd = clkDiv s (d, cmd)
+
+staticOneShot' d s trigger = oneShot s (d, trigger)
