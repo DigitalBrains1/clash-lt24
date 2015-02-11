@@ -13,11 +13,15 @@ class UartIf(object):
     RDDMADCTL = 0x0B # 8.2.6 Read Display MADCTL (page 95)
     SLPOUT    = 0x11 # 8.2.12 Sleep Out (page 101)
     DISPON    = 0x29 # 8.2.19 Display ON (page 109)
+    CASET     = 0x2A # 8.2.20 Column Address Set (page 110)
+    PASET     = 0x2B # 8.2.21 Page Address Set (page 112)
     RAMWR     = 0x2C # 8.2.22 Memory Write (page 114)
     RGBSET    = 0x2D # 8.2.23 Color Set (page 115)
     RAMRD     = 0x2E # 8.2.24 Memory Read (page 116)
     MADCTL    = 0x36 # 8.2.29 Memory Access Control (page 127)
     COLMOD    = 0x3A # 8.2.33 Pixel Format Set (page 134)
+    Write_Memory_Continue = 0x3C # 8.2.34 Write_Memory_Continue (page 135)
+    Read_Memory_Continue  = 0x3E # 8.2.35 Read_Memory_Continue (page 137)
 
     def __init__(self):
         # Non-negative when queueing commands; length of command queue
