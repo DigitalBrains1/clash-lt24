@@ -51,4 +51,9 @@ begin
 end block;"
     }
   }
+, { "BlackBox" :
+    { "name" : "CLaSH.Sized.Vector.vlength"
+    , "templateE" : "~LIT[0]"
+    }
+  }
 ]
