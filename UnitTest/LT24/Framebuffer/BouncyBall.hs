@@ -122,17 +122,27 @@ drawBall' s@(DbInitDisp n) i
            | otherwise = DbInitDisp (n+1)
         ad = case n of
                0 -> (LT24.Command, cCASET)
-               1 -> (LT24.Write  , 0     )
-               2 -> (LT24.Write  , x     )
-               3 -> (LT24.Write  , 0     )
-               4 -> (LT24.Write  , x+47  )
+               1 -> (LT24.Write  , xsH   )
+               2 -> (LT24.Write  , xsL   )
+               3 -> (LT24.Write  , xeH   )
+               4 -> (LT24.Write  , xeL   )
                5 -> (LT24.Command, cPASET)
-               6 -> (LT24.Write  , 0     )
-               7 -> (LT24.Write  , y     )
-               8 -> (LT24.Write  , 0     )
-               9 -> (LT24.Write  , y+63  )
-        x = resize (dbX i)
-        y = resize (dbY i)
+               6 -> (LT24.Write  , ysH   )
+               7 -> (LT24.Write  , ysL   )
+               8 -> (LT24.Write  , yeH   )
+               9 -> (LT24.Write  , yeL   )
+        xs = resize (dbX i) :: Unsigned 9
+        ys = resize (dbY i) :: Unsigned 9
+        xe = xs + 47
+        ye = ys + 63
+        xsL = resize (resize xs :: Unsigned 8)
+        xsH = resize (xs `shiftR` 8)
+        xeL = resize (resize xe :: Unsigned 8)
+        xeH = resize (xe `shiftR` 8)
+        ysL = resize (resize ys :: Unsigned 8)
+        ysH = resize (ys `shiftR` 8)
+        yeL = resize (resize ye :: Unsigned 8)
+        yeH = resize (ye `shiftR` 8)
 
 drawBall' s@(DbWriteRam x y ) _
     = ( s'
