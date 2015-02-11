@@ -10,6 +10,7 @@ import CLaSH.Prelude
 import Control.Applicative
 import Language.Haskell.TH
 
+import LT24.InitSteps
 import qualified LT24.LT24 as LT24
 import qualified Simul.LT24.DummyLT24 as DummyLT24
 import LT24.Commands
@@ -48,63 +49,55 @@ import Toolbox.FClk
  - 'ph' indicates the phase of command acceptance by LT24.lt24, tracking the
  - `ready` signal.
  -
- - `ip` and `ni` stand for "i plus" and "next i" respectively.
+ - `im` and `ni` stand for "i minus" and "next i" respectively.
  -}
 
-initLt24 = initLt24' <^> (0, 0, L)
+initLt24 = initLt24' <^> (fromInteger $ vlength initSteps - 1, 0, L)
 
-initLt24' (i, si, ph) (ready, action_daisy, lt24din_daisy)
-    = ((i', si', ph'), (action, lt24din, ready_daisy))
+initLt24' :: ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
+          -> (Bool, LT24.Action, Unsigned 16)
+          -> ( ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
+             , (LT24.Action, Unsigned 16, Bool))
+
+initLt24' (i, si, ph) (ready, actionDaisy, lt24dinDaisy)
+    = ((i', si', ph'), (action, lt24din, readyDaisy))
     where
-        (action, lt24din, ready_daisy)
-            = case i of
-                13 -> (action_daisy, lt24din_daisy, ready)
-                _  -> (my_action   , my_lt24din   , True )
-        (my_action, my_lt24din) = initLt24'' (i, si)
-        ip = i + 1
+        (action, lt24din, readyDaisy)
+            | i == (0 - 2) = (actionDaisy, lt24dinDaisy, ready)
+            | i == (0 - 1) = (LT24.NOP   , 0           , True )
+            | otherwise    = (myAction   , myLt24din   , True )
+        (myAction, myLt24din)
+            = case step of
+               IlL a d       -> (a         , d           )
+               IlDoPalette5b -> (LT24.Write, ( resize
+                                             . pal5bTo6b
+                                             . resize) si)
+               IlDoPalette6b -> (LT24.Write, resize si   )
+               _             -> (LT24.NOP  , 0           )
+        step = initSteps!i
+
+        (i', si', ph')
+            | i == (0 - 2)          = (i , si , ph)
+            | i == (0 - 1) && ready = (im, si , ph)
+            | i == (0 - 1)          = (i , si , ph)
+            | otherwise
+                = case (step, ph, ready) of
+                    (IlWait n, _, _    ) -> (ni, nsi, L )
+                    (_       , L, False) -> (ni, nsi, H )
+                    (_       , H, True ) -> (i , si , L )
+                    _                    -> (i , si , ph)
+        im = i - 1
         sip = si + 1
-        (ni, nsi) = case (i, si) of
-                      ( 6, 31) -> (ip, 0  )
-                      ( 6, _ ) -> (i , sip)
-                      ( 7, 63) -> (ip, 0  )
-                      ( 7, _ ) -> ( i, sip)
-                      ( 8, 31) -> (ip, 0  )
-                      ( 8, _ ) -> (i , sip)
-                      (10, $(litP $ integerL
-                             $ CS.ticksMinPeriod fClk 120e-3))
-                               -> (ip, 0  )
---                      (10, 0 ) -> (ip, 0)
-                      (10, _ ) -> (i , sip)
-                      ( _, _ ) -> (ip, 0  )
-        (i', si', ph') = case (i, ph, ready) of
-                           (13, _, _    ) -> (i , si , ph)
-                           (12, _, True ) -> (ni, nsi, ph)
-                           (10, _, _    ) -> (ni, nsi, L )
-                           (_ , L, False) -> (ni, nsi, H )
-                           (_ , H, True ) -> (i , si , L )
-                           _              -> (i , si , ph)
 
-initLt24'' :: ( Unsigned 4
-              , $(uToFit $ max (CS.ticksMinPeriod fClk 120e-3) 63))
-           -> (LT24.Action, Unsigned 16)
-
-initLt24'' ( 0, _) = (LT24.Reset  , 0            )
-initLt24'' ( 1, _) = (LT24.Command, cMADCTL      )
-initLt24'' ( 2, _) = (LT24.Write  , 8            ) -- BGR subpixel order
-initLt24'' ( 3, _) = (LT24.Command, cCOLMOD      )
-initLt24'' ( 4, _) = (LT24.Write  , 5            ) -- 16bpp MCU interface
-initLt24'' ( 5, _) = (LT24.Command, cRGBSET      )
-initLt24'' ( 6, b) = (LT24.Write  , (resize
-                                    . pal5bTo6b
-                                    . resize)   b) -- Red
-initLt24'' ( 7, b) = (LT24.Write  , resize b     ) -- Green
-initLt24'' ( 8, b) = (LT24.Write  , (resize
-                                    . pal5bTo6b
-                                    . resize)   b) -- Blue
-initLt24'' ( 9, _) = (LT24.Command, cSLPOUT      )
-initLt24'' (10, _) = (LT24.NOP    , 0            )
-initLt24'' (11, _) = (LT24.Command, cDISPON      )
-initLt24'' ( _, _) = (LT24.NOP    , 0            )
+        (ni, nsi) = case (step, si) of
+                      (IlL a d      , _ ) -> (im, 0  )
+                      (IlDoPalette5b, 31) -> (im, 0  )
+                      (IlDoPalette6b, 63) -> (im, 0  )
+                      (IlWait n     , _ ) -> if si == n then
+                                               (im, 0  )
+                                             else
+                                               (i , sip)
+                      _                   -> (i , sip)
 
 {-
  - Combines initLt24 and LT24.lt24, with as a result a component with the same

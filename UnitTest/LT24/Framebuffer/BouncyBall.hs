@@ -22,7 +22,7 @@ topEntity i = o
               , oe)
         ltdin = (fromBV . vtail) <$> i
 
-        period = ($(CS.staticOneShotPeriod fClk 0.05) <^> 1) doUpdate
+        period = ($(CS.staticOneShotPeriod fClk 0.01) <^> 1) doUpdate
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (0, 0, BpDown, BpRight)) doUpdateD
         (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
