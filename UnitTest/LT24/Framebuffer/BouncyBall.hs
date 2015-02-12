@@ -25,8 +25,10 @@ topEntity i = o
         period = ($(CS.staticOneShotPeriod fClk 0.01) <^> 1) doUpdate
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
+        (xD, yD) = (unpack . register (5, 7) . pack) (x,y)
+        (wx, wy, rx, ry) = (unpack . (juggleCoords <$>) . pack) (x,y,xD,yD)
         (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
-            = (drawBall <^> DbInitDisp 0) (x, y, accepted, period)
+            = (drawBall <^> DbInitDisp 0) (wx, wy, rx, ry, accepted, period)
 
         (action, din, accepted) = untilAccept (lt24AD, ready)
 
@@ -38,13 +40,15 @@ combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
-data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Unsigned 6) (Unsigned 6)
+data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 10) (Signed 10)
              | DbDone
     deriving (Show, Eq)
 
 data DbI = DbI
-    { dbX :: Unsigned 9
-    , dbY :: Unsigned 9
+    { dbWx :: Signed 10
+    , dbWy :: Signed 10
+    , dbRx :: Signed 10
+    , dbRy :: Signed 10
     , dbAccepted :: Bool
     , dbPeriod :: Bool
     }
@@ -98,14 +102,23 @@ ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
                BpUp   -> y - 1
                BpDown -> y + 1
 
-        xl = 320 - 64
-        yl = 240 - 48
+        xl = 320 - bbox
+        yl = 240 - bbox
 
-drawBall s (x, y, accepted, period)
+juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
+    where
+        wx = max (320-64) $ min x xD
+        wy = max (240-48) $ min y yD
+        rx = x - wx
+        ry = y - wy
+
+drawBall s (wx, wy, rx, ry, accepted, period)
     = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate))
     where
-        i = DbI { dbX = x
-                , dbY = y
+        i = DbI { dbWx = wx
+                , dbWy = wy
+                , dbRx = rx
+                , dbRy = ry
                 , dbAccepted = accepted
                 , dbPeriod = period
                 }
@@ -134,8 +147,8 @@ drawBall' s@(DbInitDisp n) i
                7 -> (LT24.Write  , ysL   )
                8 -> (LT24.Write  , yeH   )
                9 -> (LT24.Write  , yeL   )
-        xs = resize (dbX i) :: Unsigned 9
-        ys = resize (dbY i) :: Unsigned 9
+        xs = (resize . fromBV . toBV . dbWx) i :: Unsigned 9
+        ys = (resize . fromBV . toBV . dbWy) i :: Unsigned 9
         xe = xs + 63
         ye = ys + 47
         xsL = resize (resize xs :: Unsigned 8)
@@ -147,18 +160,30 @@ drawBall' s@(DbInitDisp n) i
         yeL = resize (resize ye :: Unsigned 8)
         yeH = resize (ye `shiftR` 8)
 
-drawBall' s@(DbWriteRam x y ) _
+drawBall' s@(DbWriteRam x y ) i
     = ( s'
-      , dbO { dbFbAddr = fromBV $ (toBV x) <++> (toBV y)
-            , dbFbDin  = theBall!x!y
+      , dbO { dbFbAddr = fromBV $ xBV <++> yBV
+            , dbFbDin  = d
             , dbFbWrEn = True
-            , dbDoUpdate = (x, y) == (46, 46)
+            , dbDoUpdate = s' == DbDone
             })
     where
         s' = case (x,y) of
-               (46, 46) -> DbDone
-               (46, _ ) -> DbWriteRam 0     (y+1)
+               (63, 47) -> DbDone
+               (63, _ ) -> DbWriteRam 0     (y+1)
                (_ , _ ) -> DbWriteRam (x+1) y
+
+        xBV = vselect d4 d1 d6 (toBV x) -- "Signed 10 -> Unsigned 6"
+        yBV = vselect d4 d1 d6 (toBV y) -- "Signed 10 -> Unsigned 6"
+
+        rxe = x - dbRx i -- Effective relative x-coordinate currently plotting
+        rye = y - dbRy i -- Effective relative y-coordinate currently plotting
+
+        d | rxe < 0     = 0
+          | rxe >= bbox = 0
+          | rye < 0     = 0
+          | rye >= bbox = 0
+          | otherwise   = theBall!rxe!rye
 
 drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
