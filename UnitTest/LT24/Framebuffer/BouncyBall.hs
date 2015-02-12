@@ -162,7 +162,7 @@ drawBall' s@(DbInitDisp n) i
 
 drawBall' s@(DbWriteRam x y ) i
     = ( s'
-      , dbO { dbFbAddr = fromBV $ xBV <++> yBV
+      , dbO { dbFbAddr = fromBV $ yBV <++> xBV
             , dbFbDin  = d
             , dbFbWrEn = True
             , dbDoUpdate = s' == DbDone
