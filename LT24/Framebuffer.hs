@@ -46,15 +46,15 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
 genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
-                                  (47, 63) -> (0  , 0  )
-                                  (47, _ ) -> (0  , y+1)
+                                  (63, 47) -> (0  , 0  )
+                                  (63, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+1, y  )
                  | otherwise  = (x, y)
-        coordsDone = (x, y) == (47, 63)
+        coordsDone = (x, y) == (63, 47)
 
 ramAddr :: (Unsigned 6, Unsigned 6)
           -> Unsigned 12
-ramAddr (x,y) = fromBV $ toBV x <++> toBV y
+ramAddr (x,y) = fromBV $ toBV y <++> toBV x
 
 data FbState = FbIdle | FbWrite | FbFinish1 | FbFinish2
     deriving (Show, Eq)

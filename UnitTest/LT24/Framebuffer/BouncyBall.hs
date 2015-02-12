@@ -43,7 +43,7 @@ data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Unsigned 6) (Unsigned 6)
     deriving (Show, Eq)
 
 data DbI = DbI
-    { dbX :: Unsigned 8
+    { dbX :: Unsigned 9
     , dbY :: Unsigned 9
     , dbAccepted :: Bool
     , dbPeriod :: Bool
@@ -82,21 +82,24 @@ data BallVDir = BpUp | BpDown
 ballPos (x, y, v, h) False = ((x , y , v , h ),(x, y))
 ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
     where
-        h' = case (h, y) of
-               (BpLeft , 0  ) -> BpRight
-               (BpRight, 256) -> BpLeft
-               _              -> h
-        v' = case (v, x) of
-               (BpUp  , 0  ) -> BpDown
-               (BpDown, 192) -> BpUp
-               _             -> v
+        h' = case (h, x, xl-x) of
+               (BpLeft , 0, _) -> BpRight
+               (BpRight, _, 0) -> BpLeft
+               _               -> h
+        v' = case (v, y, yl-y) of
+               (BpUp  , 0, _) -> BpDown
+               (BpDown, _, 0) -> BpUp
+               _              -> v
 
-        x' = case v' of
-               BpUp   -> x - 1
-               BpDown -> x + 1
-        y' = case h' of
-               BpLeft  -> y - 1
-               BpRight -> y + 1
+        x' = case h' of
+               BpLeft  -> x - 1
+               BpRight -> x + 1
+        y' = case v' of
+               BpUp   -> y - 1
+               BpDown -> y + 1
+
+        xl = 320 - 64
+        yl = 240 - 48
 
 drawBall s (x, y, accepted, period)
     = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate))
@@ -133,8 +136,8 @@ drawBall' s@(DbInitDisp n) i
                9 -> (LT24.Write  , yeL   )
         xs = resize (dbX i) :: Unsigned 9
         ys = resize (dbY i) :: Unsigned 9
-        xe = xs + 47
-        ye = ys + 63
+        xe = xs + 63
+        ye = ys + 47
         xsL = resize (resize xs :: Unsigned 8)
         xsH = resize (xs `shiftR` 8)
         xeL = resize (resize xe :: Unsigned 8)
@@ -160,6 +163,8 @@ drawBall' s@(DbWriteRam x y ) _
 drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
 drawBall' s i = (s, dbO)
+
+bbox = fromInteger $ vlength theBall
 
 --theBall = vcopy d47 (vcopy d47 (0 :: Unsigned 2))
 theBall = $(pixelBallTH 23 5)

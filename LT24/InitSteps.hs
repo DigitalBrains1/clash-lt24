@@ -18,7 +18,8 @@ data IlStep = IlL LT24.Action (Unsigned 16) | IlDoPalette5b | IlDoPalette6b
 
 initSteps =  IlL LT24.Reset   0
           :> IlL LT24.Command cMADCTL
-          :> IlL LT24.Write   8             -- BGR subpixel order
+          :> IlL LT24.Write   232           -- Coordinate system change,
+                                            -- BGR subpixel order
           :> IlL LT24.Command cCOLMOD
           :> IlL LT24.Write   5             -- 16bpp MCU interface
           :> IlL LT24.Command cRGBSET
