@@ -107,8 +107,8 @@ ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
 
 juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
     where
-        wx = max (320-64) $ min x xD
-        wy = max (240-48) $ min y yD
+        wx = min (320-64) $ min x xD
+        wy = min (240-48) $ min y yD
         rx = x - wx
         ry = y - wy
 
