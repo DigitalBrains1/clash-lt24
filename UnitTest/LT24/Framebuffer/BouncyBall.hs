@@ -24,7 +24,7 @@ topEntity i = o
 
         period = ($(CS.staticOneShotPeriod fClk 0.01) <^> 1) doUpdate
         doUpdateD = register False doUpdate
-        (x, y) = (ballPos <^> (0, 0, BpDown, BpRight)) doUpdateD
+        (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
             = (drawBall <^> DbInitDisp 0) (x, y, accepted, period)
 
