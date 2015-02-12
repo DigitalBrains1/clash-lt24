@@ -13,12 +13,12 @@ import Debug.Trace
 import Toolbox.Misc
 
 blockram2p :: SNat 12
-           -> SNat 12
+           -> SNat 9
            -> SNat 2
-           -> SNat 2
-           -> SignalP ( Unsigned 12, Unsigned 2, Bool, Unsigned 12
-                      , Unsigned 2, Bool)
-           -> SignalP (Unsigned 2, Unsigned 2)
+           -> SNat 16
+           -> SignalP ( Unsigned 12, Unsigned 2, Bool, Unsigned 9
+                      , Unsigned 16, Bool)
+           -> SignalP (Unsigned 2, Unsigned 16)
 
 blockram2p aaw baw aw bw (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = (qA, qB)
     where
@@ -47,12 +47,12 @@ blockram2p' aaw baw aw bw aAddrB aDinB aWrEnB bAddrB bDinB bWrEnB
         o = (blockram2p'' aaw baw aw bw <^> vcopyI L) iD
 
 blockram2p'' :: SNat 12
-             -> SNat 12
+             -> SNat 9
              -> SNat 2
-             -> SNat 2
+             -> SNat 16
              -> Vec 8192 Bit
-             -> (Unsigned 12, Vec 2 Bit, Bool, Unsigned 12, Vec 2 Bit, Bool)
-             -> (Vec 8192 Bit, (Vec 2 Bit, Vec 2 Bit))
+             -> (Unsigned 12, Vec 2 Bit, Bool, Unsigned 9, Vec 16 Bit, Bool)
+             -> (Vec 8192 Bit, (Vec 2 Bit, Vec 16 Bit))
 blockram2p'' aaw baw aw bw s (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn)
     = (s', (qA, qB))
     where

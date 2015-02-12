@@ -23,12 +23,36 @@ lt24 i@(action, din, ltdin)
         oe = signal L
 
         iD = (unpack . register (NOP, 0, 0) . pack) i
-        ready = (lt24' <^> True) iD
+        ready = (lt24' <^> (True, 1)) iD
 
-lt24' :: Bool
+lt24' :: (Bool, Integer)
       -> (Action, Unsigned 16, Unsigned 16)
-      -> (Bool, Bool)
-lt24' False (action, din, _) = (True, True)
-lt24' True  (NOP   , din, _) = (True, True)
-lt24' True  (action, din, _) = trace ((shows action . (',':) . shows din) "")
-                                  (False, False)
+      -> ((Bool, Integer), Bool)
+lt24'   (False, n) (action, din, _) = trace ("Done") ((True, n), True)
+lt24' s@(True, n)  (NOP   , din, _) = (s, True)
+lt24'   (True, n)  i@(Write , din, _) = lt24'' n i
+lt24'   (True, n)  i@(ReadFM, din, _) = lt24'' n i
+lt24'   (True, n)  i@(ReadID, din, _) = lt24'' n i
+lt24'   (True, n)    (action, din, _) = trace ( (shows action . (',':)
+                                              . shows din) "")
+                                              ((False, 1  ), False)
+
+lt24'' n  (action, din, _) = trace ( (shows n . (':':) . shows action
+                                   . (',':) . shows din) "")
+                                   ((False, n+1), False)
+
+{-
+ - If you just want to see trace messages, the following function is helpful
+ - from interactive CλaSH. It is assumed that ltdout is visible on the second
+ - bit in the output vector of Bit; if the design has the Output Enable on the
+ - lowest bit and ltdout on the bits after that, this condition has been met.
+ - By monitoring ltdout, and the fact that DummyLT24.lt24 passes din to
+ - ltdout, it is assured that din needs to be computed, usually resulting in
+ - the evaluation of all display interaction.
+ -
+ - `t`: number of timesteps to simulate
+ - `e`: the CλaSH component to test (f.e., topEntity)
+ -}
+
+onlyTrace t e = foldl xor L $ map (vexact d1) $ take t $ simulate e $ repeat
+                $ vcopyI L

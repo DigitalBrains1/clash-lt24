@@ -12,7 +12,7 @@ import qualified LT24.LT24 as LT24
 import LT24.Init (lt24WithInit)
 import LT24.Commands
 import Toolbox.Blockram2p
---import Simul.Toolbox.Blockram2p
+--import Simul.Toolbox.Blockram2p_2_2
 import Toolbox.Misc
 
 framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
@@ -50,13 +50,13 @@ genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
                                   (47, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+1, y  )
                  | otherwise  = (x, y)
-        coordsDone = (x', y') == (47, 63)
+        coordsDone = (x, y) == (47, 63)
 
 ramAddr :: (Unsigned 6, Unsigned 6)
           -> Unsigned 12
 ramAddr (x,y) = fromBV $ toBV x <++> toBV y
 
-data FbState = FbIdle | FbWrite | FbFinish
+data FbState = FbIdle | FbWrite | FbFinish1 | FbFinish2
     deriving (Show, Eq)
 
 data FbWaitState = FbWaitAccept | FbWaitDone
@@ -68,6 +68,7 @@ data FbFSMS = FbFSMS
     , fbMyActionS :: LT24.Action
     , fbMyDinS :: Unsigned 16
     }
+    deriving (Show, Eq)
 
 data FbFSMI = FbFSMI
     { fbState' :: FbState
@@ -134,17 +135,23 @@ fbFSM1 s i = (s, FbFSMO1 { fbReadyDaisy = True
                          })
 
 -- doUpdate handler
-fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
-                                               , fbLt24Ready = False})
+fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbLt24Ready = False})
     = (s, fbFSMO2)
 fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
                                                , fbLt24Ready = True })
-    = (s { fbState = FbWrite
-         , fbWaitState = FbWaitAccept
-         , fbMyActionS = LT24.Command
-         , fbMyDinS = cRAMWR
-         }
+    = ( s { fbState = FbWrite
+          , fbWaitState = FbWaitAccept
+          , fbMyActionS = LT24.Command
+          , fbMyDinS = cRAMWR
+          }
       , fbFSMO2 { fbClearDU = True })
+
+fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
+       (FbFSMI { fbLt24Ready = True })
+    = (s { fbState = FbIdle }, fbFSMO2)
+fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
+       (FbFSMI { fbLt24Ready = False })
+    = (s, fbFSMO2)
 
 fbFSM2 s@(FbFSMS { fbWaitState = FbWaitDone })
        (FbFSMI { fbLt24Ready = False })
@@ -157,14 +164,14 @@ fbFSM2 s@(FbFSMS { fbWaitState = FbWaitAccept })
     = (s, fbFSMO2)
 
 fbFSM2 s@(FbFSMS { fbState = FbWrite }) i
-    = (s { fbState = if fbCoordsDone i then FbFinish else FbWrite
-         , fbWaitState = FbWaitDone
-         , fbMyActionS = LT24.Write
-         , fbMyDinS = fbPixelColor i
-         }
+    = ( s { fbState = if fbCoordsDone i then FbFinish1 else FbWrite
+          , fbWaitState = FbWaitDone
+          , fbMyActionS = LT24.Write
+          , fbMyDinS = fbPixelColor i
+          }
       , fbFSMO2 { fbNextCoords = True })
 
-fbFSM2 s@(FbFSMS { fbState = FbFinish }) i
-    = (s { fbState = FbIdle }, fbFSMO2)
-
-fbFSM2 s i = (s, fbFSMO2)
+fbFSM2 s@(FbFSMS { fbState = FbFinish1 }) i
+    = ( s { fbState = FbFinish2
+          , fbMyActionS = LT24.NOP}
+      , fbFSMO2)
