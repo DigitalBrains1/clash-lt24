@@ -23,12 +23,20 @@ lt24 i@(action, din, ltdin)
         oe = signal L
 
         iD = (unpack . register (NOP, 0, 0) . pack) i
-        ready = (lt24' <^> True) iD
+        ready = (lt24' <^> (True, 1)) iD
 
-lt24' :: Bool
+lt24' :: (Bool, Integer)
       -> (Action, Unsigned 16, Unsigned 16)
-      -> (Bool, Bool)
-lt24' False (action, din, _) = (True, True)
-lt24' True  (NOP   , din, _) = (True, True)
-lt24' True  (action, din, _) = trace ((shows action . (',':) . shows din) "")
-                                  (False, False)
+      -> ((Bool, Integer), Bool)
+lt24'   (False, n) (action, din, _) = trace ("Done") ((True, n), True)
+lt24' s@(True, n)  (NOP   , din, _) = (s, True)
+lt24'   (True, n)  i@(Write , din, _) = lt24'' n i
+lt24'   (True, n)  i@(ReadFM, din, _) = lt24'' n i
+lt24'   (True, n)  i@(ReadID, din, _) = lt24'' n i
+lt24'   (True, n)    (action, din, _) = trace ( (shows action . (',':)
+                                              . shows din) "")
+                                              ((False, 1  ), False)
+
+lt24'' n  (action, din, _) = trace ( (shows n . (':':) . shows action
+                                   . (',':) . shows din) "")
+                                   ((False, n+1), False)
