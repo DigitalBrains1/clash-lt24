@@ -40,3 +40,19 @@ lt24'   (True, n)    (action, din, _) = trace ( (shows action . (',':)
 lt24'' n  (action, din, _) = trace ( (shows n . (':':) . shows action
                                    . (',':) . shows din) "")
                                    ((False, n+1), False)
+
+{-
+ - If you just want to see trace messages, the following function is helpful
+ - from interactive CλaSH. It is assumed that ltdout is visible on the second
+ - bit in the output vector of Bit; if the design has the Output Enable on the
+ - lowest bit and ltdout on the bits after that, this condition has been met.
+ - By monitoring ltdout, and the fact that DummyLT24.lt24 passes din to
+ - ltdout, it is assured that din needs to be computed, usually resulting in
+ - the evaluation of all display interaction.
+ -
+ - `t`: number of timesteps to simulate
+ - `e`: the CλaSH component to test (f.e., topEntity)
+ -}
+
+onlyTrace t e = foldl xor L $ map (vexact d1) $ take t $ simulate e $ repeat
+                $ vcopyI L
