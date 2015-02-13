@@ -25,7 +25,7 @@ topEntity i = o
         period = ($(CS.staticOneShotPeriod fClk 0.01) <^> 1) doUpdate
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
-        (xD, yD) = (unpack . register (5, 7) . pack) (x,y)
+        (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
         (wx, wy, rx, ry) = (unpack . (juggleCoords <$>) . pack) (x,y,xD,yD)
         (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
             = (drawBall <^> DbInitDisp 0) (wx, wy, rx, ry, accepted, period)
@@ -104,6 +104,9 @@ ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
 
         xl = 320 - bbox
         yl = 240 - bbox
+
+delayCoords s (x, y, False) = (s     , s)
+delayCoords s (x, y, True ) = ((x, y), s)
 
 juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
     where
