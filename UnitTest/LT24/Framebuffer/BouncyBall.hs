@@ -10,7 +10,6 @@ import Debug.Trace
 import qualified LT24.LT24 as LT24
 import LT24.Framebuffer
 import LT24.Commands
-import UnitTest.LT24.Framebuffer.PixelBall
 import Toolbox.Misc
 import qualified Toolbox.ClockScale as CS
 import Toolbox.FClk
@@ -40,15 +39,15 @@ combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
-data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 10) (Signed 10)
+data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
              | DbDone
     deriving (Show, Eq)
 
 data DbI = DbI
-    { dbWx :: Signed 10
-    , dbWy :: Signed 10
-    , dbRx :: Signed 10
-    , dbRy :: Signed 10
+    { dbWx :: Signed 14
+    , dbWy :: Signed 14
+    , dbRx :: Signed 14
+    , dbRy :: Signed 14
     , dbAccepted :: Bool
     , dbPeriod :: Bool
     }
@@ -176,23 +175,21 @@ drawBall' s@(DbWriteRam x y ) i
                (63, _ ) -> DbWriteRam 0     (y+1)
                (_ , _ ) -> DbWriteRam (x+1) y
 
-        xBV = vselect d4 d1 d6 (toBV x) -- "Signed 10 -> Unsigned 6"
-        yBV = vselect d4 d1 d6 (toBV y) -- "Signed 10 -> Unsigned 6"
+        xBV = vdropI (toBV x) :: Vec 6 Bit
+        yBV = vdropI (toBV y) :: Vec 6 Bit
 
-        rxe = x - dbRx i -- Effective relative x-coordinate currently plotting
-        rye = y - dbRy i -- Effective relative y-coordinate currently plotting
+        toHubX   = outerRBall + dbRx i - x
+        toHubY   = outerRBall + dbRy i - y
+        toHubSq  = toHubX * toHubX + toHubY * toHubY
 
-        d | rxe < 0     = 0
-          | rxe >= bbox = 0
-          | rye < 0     = 0
-          | rye >= bbox = 0
-          | otherwise   = theBall!rxe!rye
+        d | toHubSq <= innerRBall * innerRBall = 1
+          | toHubSq <= outerRBall * outerRBall = 3
+          | otherwise                          = 0
 
 drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
 drawBall' s i = (s, dbO)
 
-bbox = fromInteger $ vlength theBall
-
---theBall = vcopy d47 (vcopy d47 (0 :: Unsigned 2))
-theBall = $(pixelBallTH 23 5)
+outerRBall = 23
+innerRBall = 5
+bbox = outerRBall * 2 + 1
