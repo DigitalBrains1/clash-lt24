@@ -60,7 +60,7 @@ ramAddr (x,y) = fromBV $ toBV y <++> vtakeI (toBV x)
 pixelLane :: (Unsigned 6, Unsigned 16)
           -> Unsigned 2
 pixelLane (x, pixelW) = fromBV
-                      $ (vunconcatI $ toBV pixelW)!(7 - resize x :: Unsigned 3)
+                      $ (vunconcatI $ toBV pixelW)!(resize x - 1 :: Unsigned 3)
 
 data FbState = FbIdle | FbWrite | FbFinish1 | FbFinish2
     deriving (Show, Eq)
