@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module LT24.Framebuffer
+module LT24.FramebufferRMW
        (framebuffer
        ) where
 
@@ -12,7 +12,7 @@ import qualified LT24.LT24 as LT24
 import LT24.Init (lt24WithInit)
 import LT24.Commands
 import Toolbox.Blockram2p
---import Simul.Toolbox.Blockram2p_2_2
+--import Simul.Toolbox.Blockram2p_2_16
 import Toolbox.Misc
 
 framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
@@ -20,7 +20,7 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
       , wrx, rdx, ltdout, oe)
     where
 
-        (fbDout, pixel) = blockram2p d12 d12 d2 d2
+        (fbDout, pixelW) = blockram2p d12 d9 d2 d16
                             (fbAddr, fbDin, fbWrEn, myRamAddr, signal 0
                             , signal False)
 
@@ -29,6 +29,7 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
 
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y)
+        pixel = ((pixelLane <$>) . pack) (x, pixelW)
         -- Black, red, green, blue
         pixelColor = ($(v [ 0x1F :: Unsigned 16, 0x7E0, 0xF800, 0 ])!)
                      <$> pixel
@@ -53,8 +54,13 @@ genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
         coordsDone = (x, y) == (63, 47)
 
 ramAddr :: (Unsigned 6, Unsigned 6)
-          -> Unsigned 12
-ramAddr (x,y) = fromBV $ toBV y <++> toBV x
+          -> Unsigned 9
+ramAddr (x,y) = fromBV $ toBV y <++> vtakeI (toBV x)
+
+pixelLane :: (Unsigned 6, Unsigned 16)
+          -> Unsigned 2
+pixelLane (x, pixelW) = fromBV
+                      $ (vunconcatI $ toBV pixelW)!(resize x - 1 :: Unsigned 3)
 
 data FbState = FbIdle | FbWrite | FbFinish1 | FbFinish2
     deriving (Show, Eq)

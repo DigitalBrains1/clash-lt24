@@ -8,7 +8,7 @@ import Control.Applicative
 import Debug.Trace
 
 import qualified LT24.LT24 as LT24
-import LT24.Framebuffer
+import LT24.FramebufferRMW
 import LT24.Commands
 import Toolbox.Misc
 import qualified Toolbox.ClockScale as CS
