@@ -80,9 +80,9 @@ pixelLanes :: (Unsigned 6, Unsigned 16)
 pixelLanes (x, pixelW) = (pixel1, pixel2)
     where
         pixel1 = fromBV
-               $ (vunconcatI $ toBV pixelW)!(resize x - 1 :: Unsigned 3)
-        pixel2 = fromBV
                $ (vunconcatI $ toBV pixelW)!(resize x :: Unsigned 3)
+        pixel2 = fromBV
+               $ (vunconcatI $ toBV pixelW)!(resize x + 1 :: Unsigned 3)
 
 data FbState = FbIdle | FbStart | FbDiscardRead1 | FbDiscardRead2
              | FbDiscardRead3 | FbRead1 (Unsigned 7) | FbRead2 (Unsigned 7)
