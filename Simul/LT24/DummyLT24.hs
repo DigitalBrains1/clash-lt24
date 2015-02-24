@@ -9,6 +9,8 @@ import Debug.Trace
 
 import LT24.LT24 (Action(..))
 
+stride = 3
+
 lt24 i@(action, din, ltdin)
     = (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
@@ -23,23 +25,24 @@ lt24 i@(action, din, ltdin)
         oe = signal L
 
         iD = (unpack . register (NOP, 0, 0) . pack) i
-        ready = (lt24' <^> (True, 1)) iD
+        ready = (lt24' <^> (0, 1)) iD
 
-lt24' :: (Bool, Integer)
+lt24' :: (Integer, Integer)
       -> (Action, Unsigned 16, Unsigned 16)
-      -> ((Bool, Integer), Bool)
-lt24'   (False, n) (action, din, _) = trace ("Done") ((True, n), True)
-lt24' s@(True, n)  (NOP   , din, _) = (s, True)
-lt24'   (True, n)  i@(Write , din, _) = lt24'' n i
-lt24'   (True, n)  i@(ReadFM, din, _) = lt24'' n i
-lt24'   (True, n)  i@(ReadID, din, _) = lt24'' n i
-lt24'   (True, n)    (action, din, _) = trace ( (shows action . (',':)
+      -> ((Integer, Integer), Bool)
+lt24' s@(0, n)    (NOP   , din, _) = (s, True)
+lt24'   (0, n)  i@(Write , din, _) = lt24'' n i
+lt24'   (0, n)  i@(ReadFM, din, _) = lt24'' n i
+lt24'   (0, n)  i@(ReadID, din, _) = lt24'' n i
+lt24'   (0, n)    (action, din, _) = trace ( (shows action . (',':)
                                               . shows din) "")
-                                              ((False, 1  ), False)
+                                              ((stride, 1  ), False)
+lt24'   (1, n)    (action, din, _) = trace ("Done") ((0, n), True)
+lt24'   (w, n)  i                  = ((w-1, n), False)
 
 lt24'' n  (action, din, _) = trace ( (shows n . (':':) . shows action
                                    . (',':) . shows din) "")
-                                   ((False, n+1), False)
+                                   ((stride, n+1), False)
 
 {-
  - If you just want to see trace messages, the following function is helpful
