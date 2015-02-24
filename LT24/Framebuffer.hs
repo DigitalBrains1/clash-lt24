@@ -29,8 +29,8 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
 
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y)
-        -- Black, red, green, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0x7E0, 0xF800, 0 ])!)
+        -- Black, yellow, red, blue
+        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0xFFE0, 0 ])!)
                      <$> pixel
 
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
@@ -46,11 +46,11 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
 genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
-                                  (63, 47) -> (0  , 0  )
-                                  (63, _ ) -> (0  , y+1)
+                                  ( 6,  3) -> (0  , 0  )
+                                  ( 6, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+1, y  )
                  | otherwise  = (x, y)
-        coordsDone = (x, y) == (63, 47)
+        coordsDone = (x, y) == ( 6,  3)
 
 ramAddr :: (Unsigned 6, Unsigned 6)
           -> Unsigned 12
