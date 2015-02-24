@@ -12,7 +12,8 @@ import Language.Haskell.TH
 
 import LT24.InitSteps
 import qualified LT24.LT24 as LT24
-import qualified Simul.LT24.DummyLT24 as DummyLT24
+import LT24.LT24 (lt24)
+--import Simul.LT24.DummyLT24 (lt24)
 import LT24.Commands
 import LT24.Palette (pal5bTo6b)
 import qualified Toolbox.ClockScale as CS
@@ -121,6 +122,5 @@ lt24WithInit (action_daisy, din_daisy, ltdin)
     = (ready_daisy, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
     (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
-        = LT24.lt24 (action, din, ltdin)
---        = DummyLT24.lt24 (action, din, ltdin)
+        = lt24 (action, din, ltdin)
     (action, din, ready_daisy) = initLt24 (ready, action_daisy, din_daisy)
