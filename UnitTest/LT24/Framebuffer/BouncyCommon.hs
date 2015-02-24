@@ -22,7 +22,8 @@ bouncyBall fb i = o
         button = vlast <$> i
 
         buttonF = tfold (.&.) H (button, doUpdate)
-        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
+--        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
+        period = signal False
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
