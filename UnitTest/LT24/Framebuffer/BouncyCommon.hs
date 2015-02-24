@@ -136,7 +136,7 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         fbWrEn = dbFbWrEn o
         doUpdate = dbDoUpdate o
 
-drawBall' s@(DbInitDisp n) (DbI { dbAccepted = False }) = (s, dbO)
+drawBall' s (DbI { dbAccepted = False }) = (s, dbO)
 drawBall' s@(DbInitDisp n) i
     = ( s'
       , dbO { dbLt24AD = Just ad })
