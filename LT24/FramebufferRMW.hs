@@ -64,8 +64,8 @@ genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
 genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
-                                  (62, 47) -> (0  , 0  )
-                                  (62, _ ) -> (0  , y+1)
+                                  (30, 0 ) -> (0  , 0  )
+                                  (30, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+2, y  )
                  | otherwise  = (x, y)
         coordsDone = (x, y) == (0, 0)
@@ -326,7 +326,8 @@ fbFSM2 s@(FbFSMS { fbState = FbRead5 n })
                       }
                   , fbFSMO2)
     where
-        nextAction | n == 127  = LT24.NOP
+        --nextAction | n == 127  = LT24.NOP
+        nextAction | n == 15   = LT24.NOP
                    | otherwise = LT24.ReadFM
 
 -- Wait for third read to complete, compute second pixel
@@ -348,7 +349,8 @@ fbFSM2 s@(FbFSMS { fbState = FbRead6 n
                             , fbPixelOut = pixel2
                             })
     where
-        state' | n == 127  = FbWriteCmd1
+        --state' | n == 127  = FbWriteCmd1
+        state' | n == 15   = FbWriteCmd1
                | otherwise = FbRead1 (n + 1)
         pixel2Eff = if pixel2 == 0 then
                       oldPixelColor
@@ -397,7 +399,8 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite2 n })
     | otherwise = (s { fbState = state' }
                   , fbFSMO2 { fbAddrMode = FbScratchpad (n+1) })
     where
-        state' | n == 127  = FbFinish1
+        --state' | n == 127  = FbFinish1
+        state' | n == 15   = FbFinish1
                | otherwise = FbWrite1 (n+1)
 
 {- 
