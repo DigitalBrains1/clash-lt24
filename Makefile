@@ -1,6 +1,8 @@
 VHDL_TARGETS = vhdl uartif uartif_inited lt24top hallotx hallotx_fifo echo_swap_case
 
 vhdl_TOP = CLaSHMain.hs
+bouncyball_TOP = UnitTest/LT24/Framebuffer/BouncyBall.hs
+bouncyball_rmw_TOP = UnitTest/LT24/Framebuffer/BouncyBallRMW.hs
 uartif_TOP = UnitTest/LT24/UARTInterface/IntfBare.hs
 uartif_inited_TOP = UnitTest/LT24/UARTInterface/IntfInited.hs
 lt24top_TOP = UnitTest/LT24/LT24/LT24Top.hs
