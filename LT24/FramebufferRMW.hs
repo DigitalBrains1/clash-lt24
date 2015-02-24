@@ -64,8 +64,8 @@ genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
 genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
-                                  (30, 0 ) -> (0  , 0  )
-                                  (30, _ ) -> (0  , y+1)
+                                  ( 6, 3 ) -> (0  , 0  )
+                                  ( 6, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+2, y  )
                  | otherwise  = (x, y)
         coordsDone = (x, y) == (0, 0)
