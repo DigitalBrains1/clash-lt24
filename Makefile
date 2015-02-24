@@ -16,11 +16,14 @@ endef
 $(foreach tgt,$(VHDL_TARGETS),$(eval $(call VHDL_template,$(tgt))))
 
 check:
-	for t in $(foreach tgt, $(VHDL_TARGETS), $($(tgt)_TOP)); do \
+	for t in $(foreach tgt, $(VHDL_TARGETS), $($(tgt)_TOP)) Main.hs; do \
 		clash $$t 2>&1 || exit $?; \
 	done | tee make.log
 
-.PHONY: clean check $(VHDL_TARGETS)
+main:
+	clash Main.hs 2>&1 | tee make.log
+
+.PHONY: clean check $(VHDL_TARGETS) main
 
 clean:
 	find . -name '*.o' -type f -delete
