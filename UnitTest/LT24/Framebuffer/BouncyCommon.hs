@@ -19,11 +19,11 @@ bouncyBall fb i = o
               ( signal L, signal H, lcdOn, csx, resx, dcx, wrx, rdx, ltdout
               , oe)
         ltdin = (fromBV . vdrop d2) <$> i
-        button = vlast <$> i
+        button = vhead <$> i
 
         buttonF = tfold (.&.) H (button, doUpdate)
---        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
-        period = signal False
+        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
+--        period = signal False
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
