@@ -130,7 +130,7 @@ class UartIf(object):
     def init_lt24(self):
         self.lt24_reset()
         self.lt24_command(self.MADCTL)
-        self.lt24_write(0b1000) # BGR subpixel order
+        self.lt24_write(0b11101000) # Coordinate change, BGR subpixel order
         self.lt24_command(self.COLMOD)
         self.lt24_write(0b101) # 16bpp MCU interface
         self.trivial_palette()
