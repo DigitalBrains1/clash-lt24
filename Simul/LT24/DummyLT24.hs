@@ -9,7 +9,8 @@ import Debug.Trace
 
 import LT24.LT24 (Action(..))
 
-stride = 3
+strideBusy = 3
+strideReady = 3
 
 lt24 i@(action, din, ltdin)
     = (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
@@ -25,24 +26,26 @@ lt24 i@(action, din, ltdin)
         oe = signal L
 
         iD = (unpack . register (NOP, 0, 0) . pack) i
-        ready = (lt24' <^> (0, 1)) iD
+        ready = (lt24' <^> (True, 1, 1)) iD
 
-lt24' :: (Integer, Integer)
+lt24' :: (Bool, Integer, Integer)
       -> (Action, Unsigned 16, Unsigned 16)
-      -> ((Integer, Integer), Bool)
-lt24' s@(0, n)    (NOP   , din, _) = (s, True)
-lt24'   (0, n)  i@(Write , din, _) = lt24'' n i
-lt24'   (0, n)  i@(ReadFM, din, _) = lt24'' n i
-lt24'   (0, n)  i@(ReadID, din, _) = lt24'' n i
-lt24'   (0, n)    (action, din, _) = trace ( (shows action . (',':)
-                                              . shows din) "")
-                                              ((stride, 1  ), False)
-lt24'   (1, n)    (action, din, _) = trace ("Done") ((0, n), True)
-lt24'   (w, n)  i                  = ((w-1, n), False)
+      -> ((Bool, Integer, Integer), Bool)
 
-lt24'' n  (action, din, _) = trace ( (shows n . (':':) . shows action
-                                   . (',':) . shows din) "")
-                                   ((stride, n+1), False)
+lt24'   (False, 1, n) i                  = trace "Done"
+                                             ((True, strideReady, n), True)
+lt24' s@(True , 1, n)    (NOP   , din, _) = (s, True)
+lt24'   (True , 1, n)  i@(Write , din, _) = lt24'' n i
+lt24'   (True , 1, n)  i@(ReadFM, din, _) = lt24'' n i
+lt24'   (True , 1, n)  i@(ReadID, din, _) = lt24'' n i
+lt24'   (True , 1, n)    (action, din, _) = trace ( (shows action . (',':)
+                                                    . shows din) "")
+                                              ((False, strideBusy, 1), False)
+lt24'   (r    , w, n)  i                  = ((r, w-1, n), r)
+
+lt24'' n (action, din, _) = trace ( (shows n . (':':) . shows action
+                                    . (',':) . shows din) "")
+                              ((False, strideBusy, n+1), False)
 
 {-
  - If you just want to see trace messages, the following function is helpful
