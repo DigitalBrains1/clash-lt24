@@ -46,11 +46,11 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
 genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
-                                  ( 7,  3) -> (0  , 0  )
-                                  ( 7, _ ) -> (0  , y+1)
+                                  (63, 47) -> (0  , 0  )
+                                  (63, _ ) -> (0  , y+1)
                                   ( _, _ ) -> (x+1, y  )
                  | otherwise  = (x, y)
-        coordsDone = (x, y) == ( 7,  3)
+        coordsDone = (x, y) == (63, 47)
 
 ramAddr :: (Unsigned 6, Unsigned 6)
           -> Unsigned 12

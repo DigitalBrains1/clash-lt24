@@ -113,8 +113,8 @@ delayCoords s (x, y, True ) = ((x, y), s)
 
 juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
     where
-        wx = min (320-8) $ min x xD
-        wy = min (240-4) $ min y yD
+        wx = min (320-64) $ min x xD
+        wy = min (240-48) $ min y yD
         rx = x - wx
         ry = y - wy
 
@@ -156,8 +156,8 @@ drawBall' s@(DbInitDisp n) i
                9 -> (LT24.Write  , yeL   )
         xs = (resize . fromBV . toBV . dbWx) i :: Unsigned 9
         ys = (resize . fromBV . toBV . dbWy) i :: Unsigned 9
-        xe = xs + 7
-        ye = ys + 3
+        xe = xs + 63
+        ye = ys + 47
         xsL = resize (resize xs :: Unsigned 8)
         xsH = resize (xs `shiftR` 8)
         xeL = resize (resize xe :: Unsigned 8)
@@ -176,8 +176,8 @@ drawBall' s@(DbWriteRam x y ) i
             })
     where
         s' = case (x,y) of
-               ( 7,  3) -> DbDone
-               ( 7, _ ) -> DbWriteRam 0     (y+1)
+               (63, 47) -> DbDone
+               (63, _ ) -> DbWriteRam 0     (y+1)
                (_ , _ ) -> DbWriteRam (x+1) y
 
         xBV = vdropI (toBV x) :: Vec 6 Bit
@@ -196,6 +196,6 @@ drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
 drawBall' s i = (s, dbO)
 
-outerRBall = 1
-innerRBall = 0
+outerRBall = 23
+innerRBall = 5
 bbox = outerRBall * 2 + 1
