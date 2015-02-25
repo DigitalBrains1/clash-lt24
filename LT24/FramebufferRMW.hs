@@ -219,13 +219,13 @@ fbFSM2 s@(FbFSMS { fbState = FbIdle }) i
  -}
 fbFSM2 s@(FbFSMS { fbState = FbStart })
        (FbFSMI { fbLt24Ready = ready })
-    | not ready = (s, fbFSMO2)
+    | ready     = (s, fbFSMO2)
     | otherwise = ( s { fbState = FbDiscardRead1
                       , fbMyActionS = LT24.ReadFM
                       }
                   , fbFSMO2)
 
--- Wait for cRAMRD to complete
+-- Wait for cRAMRD/cRead_Memory_Continue to complete
 fbFSM2 s@(FbFSMS { fbState = FbDiscardRead1 })
        (FbFSMI { fbLt24Ready = ready })
     | not ready = (s, fbFSMO2)
@@ -249,10 +249,7 @@ fbFSM2 s@(FbFSMS { fbState = FbDiscardRead3 })
                   , fbFSMO2)
 
 {-
- - Previous state = FbDiscardRead3:
- -     Wait for first real read acceptance, queue next read
- - Previous state = FbRead7 n:
- -     Wait for read from FbRead6 n to complete, queue next read
+ - Wait for first real read acceptance, queue second read
  -}
 fbFSM2 s@(FbFSMS { fbState = FbRead1 n })
        (FbFSMI { fbLt24Ready = ready })
@@ -269,7 +266,6 @@ fbFSM2 s@(FbFSMS { fbState = FbRead2 n })
                })
     | not ready = (s, fbFSMO2)
     | otherwise = ( s { fbState = FbRead3 n
-                      , fbMyActionS = LT24.ReadFM
                       , fbR1 = r1
                       , fbG1 = g1
                       }
@@ -278,7 +274,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead2 n })
         r1 = pal6bTo5b $ resize $ dat `shiftR` 10
         g1 = resize $ dat `shiftR` 2
 
--- Wait for read acceptance, queue second read
+-- Wait for second read acceptance, queue third read
 fbFSM2 s@(FbFSMS { fbState = FbRead3 n })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
