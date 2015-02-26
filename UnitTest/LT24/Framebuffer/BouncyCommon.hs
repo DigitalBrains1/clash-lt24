@@ -34,9 +34,10 @@ bouncyBall fb i = o
 
         (action, din, accepted) = untilAccept (lt24AD, ready)
 
+        pageStart = (resize . fromBV . toBV) <$> wy :: Signal (Unsigned 8)
         ( ready, fbDout, updateDone, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
             = fb ( action, din, fbAddr, fbDin, fbWrEn
-                 , doUpdate, ltdin)
+                 , pageStart, doUpdate, ltdin)
 
 combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
