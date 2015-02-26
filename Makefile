@@ -1,4 +1,4 @@
-VHDL_TARGETS = vhdl uartif uartif_inited lt24top hallotx hallotx_fifo echo_swap_case
+VHDL_TARGETS = vhdl bouncyball bouncyball_rmw uartif uartif_inited lt24top hallotx hallotx_fifo echo_swap_case
 
 vhdl_TOP = CLaSHMain.hs
 bouncyball_TOP = UnitTest/LT24/Framebuffer/BouncyBall.hs
