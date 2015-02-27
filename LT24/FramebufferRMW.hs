@@ -33,8 +33,8 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y, addrMode)
         (pixel1, pixel2) = (unpack . (pixelLanes <$>) . pack) (x, myRamDOut)
-        -- Green, yellow, red, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0xFFE0, 0x7E0 ])!)
+        -- Green (should be ignore), black, red, blue
+        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0x7E0 ])!)
                      <$> pixelOut
 
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
