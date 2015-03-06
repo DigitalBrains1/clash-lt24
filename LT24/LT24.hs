@@ -136,9 +136,8 @@ lt24'1 (st, wait, edgeBufO, cmdBufI, cmdBufO)
         dout     | st /= LTIdle && st' == LTIdle = ltdin
                  | otherwise                     = cmdBufO
         -- Latches as soon as we leave Idle
-        ltdout' = case st of
-                    LTIdle -> dinD
-                    _      -> ltdout
+        ltdout' | st == LTIdle && st' /= LTIdle = dinD
+                | otherwise                     = ltdout
 
         (st', wait', resx', dcx', wrx', rdx', oe')
             | wait > 0  = (st, wait - 1, resx, dcx, wrx, rdx, oe)
