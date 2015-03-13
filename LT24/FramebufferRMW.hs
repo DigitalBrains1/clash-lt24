@@ -18,9 +18,9 @@ import Toolbox.Blockram2p
 import Toolbox.Misc
 
 framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
-            , ltdin)
-    = ( readyDaisy, fbDout, updateDone, lt24DOut, lcdOn, csx, resx, dcx
-      , wrx, rdx, ltdout, oe)
+            , pixelColor, ltdin)
+    = ( readyDaisy, fbDout, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
+      , dcx, wrx, rdx, ltdout, oe)
     where
 
         (fbDout, myRamDOut) = blockram2p d12 d9 d2 d16
@@ -33,12 +33,10 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y, addrMode)
         (pixel1, pixel2) = (unpack . (pixelLanes <$>) . pack) (x, myRamDOut)
-        -- Green (should be ignore), black, red, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0x7E0 ])!)
-                     <$> pixelOut
 
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
-        (readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords, pixelOut, addrMode, myRamDIn, myRamWrEn)
+        ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords,
+          pixelVal, addrMode, myRamDIn, myRamWrEn)
             = (fbFSM <^> FbFSMS { fbState = FbIdle
                                 , fbPageStartS = 0
                                 , fbPixel2Buf = 0
@@ -124,7 +122,7 @@ data FbFSMO1 = FbFSMO1
 data FbFSMO2 = FbFSMO2
     { fbClearDU :: Bool
     , fbNextCoords :: Bool
-    , fbPixelOut :: Unsigned 2
+    , fbPixelVal :: Unsigned 2
     , fbAddrMode :: FbAddrMode
     , fbMyRamDIn :: Unsigned 16
     , fbMyRamWrEn :: Bool
@@ -133,7 +131,7 @@ data FbFSMO2 = FbFSMO2
 fbFSMO2 = FbFSMO2
     { fbClearDU = False
     , fbNextCoords = False
-    , fbPixelOut = 0
+    , fbPixelVal = 0
     , fbAddrMode = FbFramebuffer
     , fbMyRamDIn = 0
     , fbMyRamWrEn = False
@@ -143,7 +141,7 @@ fbFSM s
       (actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready, lt24DOut
       , coordsDone , pixel1, pixel2, pixelColor, myRamDOut)
     = (s', ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn
-           , nextCoords, pixelOut, addrMode, myRamDIn, myRamWrEn))
+           , nextCoords, pixelVal, addrMode, myRamDIn, myRamWrEn))
     where
 --        s't | s' == s   = s'
 --            | otherwise = trace (show s') s'
@@ -154,7 +152,7 @@ fbFSM s
         lt24Action = fbLt24Action o1
         lt24DIn = fbLt24DIn o1
         nextCoords = fbNextCoords o2
-        pixelOut = fbPixelOut o2
+        pixelVal = fbPixelVal o2
         addrMode =fbAddrMode o2
         myRamDIn = fbMyRamDIn o2
         myRamWrEn = fbMyRamWrEn o2
@@ -382,7 +380,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
                   , fbFSMO2 { fbAddrMode = FbScratchpad n
                             , fbMyRamDIn = pixel1Eff
                             , fbMyRamWrEn = True
-                            , fbPixelOut = pixel1
+                            , fbPixelVal = pixel1
                             })
     where
         pixel1Eff = if pixel1 == 0 then
@@ -421,7 +419,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead6 n
                             , fbAddrMode = FbScratchpad n
                             , fbMyRamDIn = pixel2Eff
                             , fbMyRamWrEn = True
-                            , fbPixelOut = pixel2
+                            , fbPixelVal = pixel2
                             })
     where
         state' | n == 127  = FbWriteCmd1

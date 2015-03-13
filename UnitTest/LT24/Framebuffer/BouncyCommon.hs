@@ -22,8 +22,8 @@ bouncyBall fb i = o
         button = vhead <$> i
 
         buttonF = tfold (.&.) H (button, doUpdate)
---        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
-        period = signal True
+        period = ($(CS.staticOneShotPeriod fClk 0.01) <^> 1) doUpdate
+--        period = signal True
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
@@ -35,9 +35,13 @@ bouncyBall fb i = o
         (action, din, accepted) = untilAccept (lt24AD, ready)
 
         pageStart = (resize . fromBV . toBV) <$> wy :: Signal (Unsigned 8)
-        ( ready, fbDout, updateDone, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
-            = fb ( action, din, fbAddr, fbDin, fbWrEn
-                 , pageStart, doUpdate, ltdin)
+        ( ready, fbDout, updateDone, pixelVal, dout, lcdOn, csx, resx, dcx,
+          wrx, rdx, ltdout, oe)
+            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate
+                 , pixelColor, ltdin)
+        -- Yellow, black, red, blue
+        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0xFFE0 ])!)
+                     <$> pixelVal
 
 combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
