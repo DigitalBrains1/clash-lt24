@@ -13,14 +13,14 @@ import qualified LT24.LT24 as LT24
 topEntity i = o
     where
         o = ((combineOutput <$>) . pack)
-              (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
         (action, din, ltdin) = (unpack . (splitInput <$>)) i
-        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+        (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
             = LT24.lt24 (action, din, ltdin)
 
-combineOutput (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+combineOutput (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = (toBV ready <++> toBV dout
-       <++> (lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+       <++> (lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
 splitInput :: Vec 35 Bit

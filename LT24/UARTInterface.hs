@@ -80,12 +80,12 @@ intfInited = intf lt24WithInit
 intf lt24 i = o
     where
         o = ((combineOutput <$>) . pack)
-              (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
 
         rxd = vhead <$> i
         ltdin = (fromBV . vtail) <$> i
 
-        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+        (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe) =
             lt24 (action, din, ltdin)
 
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
@@ -105,8 +105,8 @@ intf lt24 i = o
  - topEntity are combined into a bitvector. The VHDL wrapper then untangles the
  - vector.
  -}
-combineOutput (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
-    = ((gpioO :> txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
 -- Command interface
