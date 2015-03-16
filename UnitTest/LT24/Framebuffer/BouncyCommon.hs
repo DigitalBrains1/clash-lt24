@@ -22,7 +22,7 @@ bouncyBall fb i = o
         button = vhead <$> i
 
         buttonF = tfold (.&.) H (button, doUpdate)
-        period = ($(CS.staticOneShotPeriod fClk 0.002) <^> 1) doUpdate
+        period = ($(CS.staticOneShotPeriod fClk 0.02) <^> 1) doUpdate
 --        period = signal True
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
@@ -146,7 +146,7 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         doUpdate = dbDoUpdate o
         needAccess = dbNeedAccess o
 
-drawBall' s@(DbInitDisp n) (DbI { dbAccepted = False })
+drawBall' s (DbI { dbAccepted = False })
     = (s, dbO { dbNeedAccess = True })
 
 drawBall' s@(DbInitDisp n) i
