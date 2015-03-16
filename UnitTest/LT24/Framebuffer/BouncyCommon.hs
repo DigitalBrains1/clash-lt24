@@ -49,38 +49,6 @@ combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
-data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
-             | DbDone
-    deriving (Show, Eq)
-
-data DbI = DbI
-    { dbWx :: Signed 14
-    , dbWy :: Signed 14
-    , dbRx :: Signed 14
-    , dbRy :: Signed 14
-    , dbAccepted :: Bool
-    , dbPeriod :: Bool
-    , dbButtonF :: Bit
-    }
-
-data DbO = DbO
-    { dbLt24AD :: Maybe (LT24.Action, Unsigned 16)
-    , dbFbAddr :: Unsigned 12
-    , dbFbDin :: Unsigned 2
-    , dbFbWrEn :: Bool
-    , dbDoUpdate :: Bool
-    , dbNeedAccess :: Bool
-    }
-
-dbO = DbO
-    { dbLt24AD = Nothing
-    , dbFbAddr = 0
-    , dbFbDin = 0
-    , dbFbWrEn = False
-    , dbDoUpdate = False
-    , dbNeedAccess = False
-    }
-
 untilAccept = untilAccept' <^> (LT24.NOP, 0, True)
 untilAccept' (c, d, lastReady) (i, ready)
     = ((c', d', ready), (c', d', accepted))
@@ -127,6 +95,38 @@ juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
         rx = x - wx
         ry = y - wy
 
+data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
+             | DbDone
+    deriving (Show, Eq)
+
+data DbI = DbI
+    { dbWx :: Signed 14
+    , dbWy :: Signed 14
+    , dbRx :: Signed 14
+    , dbRy :: Signed 14
+    , dbAccepted :: Bool
+    , dbPeriod :: Bool
+    , dbButtonF :: Bit
+    }
+
+data DbO = DbO
+    { dbLt24AD :: Maybe (LT24.Action, Unsigned 16)
+    , dbFbAddr :: Unsigned 12
+    , dbFbDin :: Unsigned 2
+    , dbFbWrEn :: Bool
+    , dbDoUpdate :: Bool
+    , dbNeedAccess :: Bool
+    }
+
+dbO = DbO
+    { dbLt24AD = Nothing
+    , dbFbAddr = 0
+    , dbFbDin = 0
+    , dbFbWrEn = False
+    , dbDoUpdate = False
+    , dbNeedAccess = False
+    }
+
 drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
     = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess))
     where
@@ -146,7 +146,9 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         doUpdate = dbDoUpdate o
         needAccess = dbNeedAccess o
 
-drawBall' s (DbI { dbAccepted = False }) = (s, dbO)
+drawBall' s@(DbInitDisp n) (DbI { dbAccepted = False })
+    = (s, dbO { dbNeedAccess = True })
+
 drawBall' s@(DbInitDisp n) i
     = ( s'
       , dbO { dbLt24AD = Just ad
