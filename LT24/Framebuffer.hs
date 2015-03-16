@@ -169,6 +169,15 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite }) i
           }
       , fbFSMO2 { fbNextCoords = True })
 
+fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
+       (FbFSMI { fbDoUpdateF = True })
+    = ( s { fbState = FbWrite
+          , fbWaitState = FbWaitDone
+          , fbMyActionS = LT24.Command
+          , fbMyDinS = cRAMWR
+          }
+      , fbFSMO2 { fbClearDU = True })
+
 fbFSM2 s@(FbFSMS { fbState = FbFinish1 }) i
     = ( s { fbState = FbFinish2
           , fbMyActionS = LT24.NOP}
