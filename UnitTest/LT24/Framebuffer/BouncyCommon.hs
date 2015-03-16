@@ -41,8 +41,8 @@ bouncyBall fb i = o
 --                 , pixelColor, ltdin)
             = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart
                  , not <$> needAccess, pixelColor, ltdin)
-        -- Yellow, black, red, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0xFFE0 ])!)
+        -- Black, black, red, blue
+        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0 ])!)
                      <$> pixelVal
 
 combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
