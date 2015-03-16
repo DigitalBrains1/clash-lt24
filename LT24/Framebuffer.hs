@@ -15,23 +15,21 @@ import Toolbox.Blockram2p
 --import Simul.Toolbox.Blockram2p_2_2
 import Toolbox.Misc
 
-framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, ltdin)
-    = ( readyDaisy, fbDout, updateDone, lt24Dout, lcdOn, csx, resx, dcx
-      , wrx, rdx, ltdout, oe)
+framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, pixelColor
+            , ltdin)
+    = ( readyDaisy, fbDout, updateDone, pixelVal, lt24Dout, lcdOn, csx, resx
+      , dcx, wrx, rdx, ltdout, oe)
     where
 
-        (fbDout, pixel) = blockram2p d12 d12 d2 d2
-                            (fbAddr, fbDin, fbWrEn, myRamAddr, signal 0
-                            , signal False)
+        (fbDout, pixelVal) = blockram2p d12 d12 d2 d2
+                               (fbAddr, fbDin, fbWrEn, myRamAddr, signal 0
+                               , signal False)
 
         (lt24Ready, lt24Dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe) =
             lt24WithInit (lt24Action, lt24Din, ltdin)
 
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y)
-        -- Black, yellow, red, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0xFFE0, 0 ])!)
-                     <$> pixel
 
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
         (readyDaisy, updateDone, clearDU, lt24Action, lt24Din, nextCoords)
@@ -170,6 +168,15 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite }) i
           , fbMyDinS = fbPixelColor i
           }
       , fbFSMO2 { fbNextCoords = True })
+
+fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
+       (FbFSMI { fbDoUpdateF = True })
+    = ( s { fbState = FbWrite
+          , fbWaitState = FbWaitDone
+          , fbMyActionS = LT24.Command
+          , fbMyDinS = cRAMWR
+          }
+      , fbFSMO2 { fbClearDU = True })
 
 fbFSM2 s@(FbFSMS { fbState = FbFinish1 }) i
     = ( s { fbState = FbFinish2

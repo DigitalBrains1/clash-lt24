@@ -17,9 +17,10 @@ import Toolbox.Blockram2p
 --import Simul.Toolbox.Blockram2p_2_16
 import Toolbox.Misc
 
-framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, doUpdate, ltdin)
-    = ( readyDaisy, fbDout, updateDone, lt24DOut, lcdOn, csx, resx, dcx
-      , wrx, rdx, ltdout, oe)
+framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
+            , pixelColor, ltdin)
+    = ( readyDaisy, fbDout, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
+      , dcx, wrx, rdx, ltdout, oe)
     where
 
         (fbDout, myRamDOut) = blockram2p d12 d9 d2 d16
@@ -32,14 +33,12 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, doUpdate, ltdin)
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y, addrMode)
         (pixel1, pixel2) = (unpack . (pixelLanes <$>) . pack) (x, myRamDOut)
-        -- Green, yellow, red, blue
-        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0xFFE0, 0x7E0 ])!)
-                     <$> pixelOut
 
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
-        (readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords, pixelOut, addrMode, myRamDIn, myRamWrEn)
+        ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords,
+          pixelVal, addrMode, myRamDIn, myRamWrEn)
             = (fbFSM <^> FbFSMS { fbState = FbIdle
-                                , fbStartAddress = True
+                                , fbPageStartS = 0
                                 , fbPixel2Buf = 0
                                 , fbR1 = 0
                                 , fbG1 = 0
@@ -47,19 +46,8 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, doUpdate, ltdin)
                                 , fbMyActionS = LT24.NOP
                                 , fbMyDInS = 0
                                 })
-                ( actionDaisy, dInDaisy, doUpdateF, lt24Ready, lt24DOut
-                , coordsDone, pixel1, pixel2, pixelColor, myRamDOut)
-
-{-
-genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
-    where
-        (x', y') | nextCoords = case (x, y) of
-                                  (63, 47) -> (0  , 0  )
-                                  (63, _ ) -> (0  , y+1)
-                                  ( _, _ ) -> (x+1, y  )
-                 | otherwise  = (x, y)
-        coordsDone = (x, y) == (63, 47)
--}
+                ( actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready
+                , lt24DOut , coordsDone, pixel1, pixel2, pixelColor, myRamDOut)
 
 genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
     where
@@ -84,7 +72,9 @@ pixelLanes (x, pixelW) = (pixel1, pixel2)
         pixel2 = fromBV
                $ (vunconcatI $ toBV pixelW)!(resize x + 1 :: Unsigned 3)
 
-data FbState = FbIdle | FbStart | FbDiscardRead1 | FbDiscardRead2
+data FbState = FbIdle | FbSendPA1 | FbSendPA2 | FbSendPA3 | FbSendPA4
+             | FbSendPA5 | FbSendPA6 | FbSendPA7 | FbSendPA8 | FbSendPA9
+             | FbSendPA10 | FbReadCommand | FbDiscardRead1 | FbDiscardRead2
              | FbDiscardRead3 | FbRead1 (Unsigned 7) | FbRead2 (Unsigned 7)
              | FbRead3 (Unsigned 7) | FbRead4 (Unsigned 7)
              | FbRead5 (Unsigned 7) | FbRead6 (Unsigned 7) | FbWriteCmd1
@@ -96,7 +86,7 @@ data FbAddrMode = FbFramebuffer | FbScratchpad (Unsigned 7)
 
 data FbFSMS = FbFSMS
     { fbState :: FbState
-    , fbStartAddress :: Bool
+    , fbPageStartS :: Unsigned 8
     , fbPixel2Buf :: Unsigned 2
     , fbR1 :: Unsigned 5
     , fbG1 :: Unsigned 5
@@ -110,6 +100,7 @@ data FbFSMI = FbFSMI
     { fbState' :: FbState
     , fbActionDaisy :: LT24.Action
     , fbDInDaisy :: Unsigned 16
+    , fbPageStartI :: Unsigned 8
     , fbDoUpdateF :: Bool
     , fbLt24Ready :: Bool
     , fbLt24DOut :: Unsigned 16
@@ -131,7 +122,7 @@ data FbFSMO1 = FbFSMO1
 data FbFSMO2 = FbFSMO2
     { fbClearDU :: Bool
     , fbNextCoords :: Bool
-    , fbPixelOut :: Unsigned 2
+    , fbPixelVal :: Unsigned 2
     , fbAddrMode :: FbAddrMode
     , fbMyRamDIn :: Unsigned 16
     , fbMyRamWrEn :: Bool
@@ -140,17 +131,17 @@ data FbFSMO2 = FbFSMO2
 fbFSMO2 = FbFSMO2
     { fbClearDU = False
     , fbNextCoords = False
-    , fbPixelOut = 0
+    , fbPixelVal = 0
     , fbAddrMode = FbFramebuffer
     , fbMyRamDIn = 0
     , fbMyRamWrEn = False
     }
 
 fbFSM s
-      (actionDaisy, dInDaisy, doUpdateF, lt24Ready, lt24DOut, coordsDone
-      , pixel1, pixel2, pixelColor, myRamDOut)
+      (actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready, lt24DOut
+      , coordsDone , pixel1, pixel2, pixelColor, myRamDOut)
     = (s', ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn
-           , nextCoords, pixelOut, addrMode, myRamDIn, myRamWrEn))
+           , nextCoords, pixelVal, addrMode, myRamDIn, myRamWrEn))
     where
 --        s't | s' == s   = s'
 --            | otherwise = trace (show s') s'
@@ -161,7 +152,7 @@ fbFSM s
         lt24Action = fbLt24Action o1
         lt24DIn = fbLt24DIn o1
         nextCoords = fbNextCoords o2
-        pixelOut = fbPixelOut o2
+        pixelVal = fbPixelVal o2
         addrMode =fbAddrMode o2
         myRamDIn = fbMyRamDIn o2
         myRamWrEn = fbMyRamWrEn o2
@@ -169,6 +160,7 @@ fbFSM s
         i = FbFSMI { fbState' = fbState s2'
                    , fbActionDaisy = actionDaisy
                    , fbDInDaisy = dInDaisy
+                   , fbPageStartI = pageStart
                    , fbDoUpdateF = doUpdateF
                    , fbLt24Ready = lt24Ready
                    , fbLt24DOut = lt24DOut
@@ -198,12 +190,13 @@ fbFSM1 s i = (s, FbFSMO1 { fbReadyDaisy = True
 ------ doUpdate handler ------
 
 -- lt24 available and update requested; go!
-fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
-                                               , fbLt24Ready = True })
-    = ( s { fbState = FbStart
+fbFSM2 s@(FbFSMS { fbState = FbIdle }) i@(FbFSMI { fbDoUpdateF = True
+                                                 , fbLt24Ready = True
+                                                 , fbPageStartI = pageStart })
+    = ( s { fbState = FbSendPA1
           , fbMyActionS = LT24.Command
-          , fbMyDInS = cRAMRD
-          , fbStartAddress = True
+          , fbMyDInS = cPASET
+          , fbPageStartS = pageStart
           }
       , fbFSMO2 { fbClearDU = True })
 
@@ -211,13 +204,98 @@ fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
 fbFSM2 s@(FbFSMS { fbState = FbIdle }) i
     = (s, fbFSMO2)
 
+-- Wait for acceptance of cPASET, then queue write of start high byte
+fbFSM2 s@(FbFSMS { fbState = FbSendPA1 })
+       (FbFSMI { fbLt24Ready = ready })
+    | ready     = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA2
+                      , fbMyActionS = LT24.Write
+                      , fbMyDInS = 0
+                      }
+                  , fbFSMO2)
+
+-- Wait for cPASET to complete
+fbFSM2 s@(FbFSMS { fbState = FbSendPA2 })
+       (FbFSMI { fbLt24Ready = ready })
+    | not ready = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA3 }
+                  , fbFSMO2)
+
+-- Wait for acceptance of first write, then queue write of start low byte
+fbFSM2 s@(FbFSMS { fbState = FbSendPA3
+                 , fbPageStartS = pageStart })
+       (FbFSMI { fbLt24Ready = ready })
+    | ready     = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA4
+                      , fbMyActionS = LT24.Write
+                      , fbMyDInS = resize $ pageStart
+                      }
+                  , fbFSMO2)
+
+-- Wait for first write to complete
+fbFSM2 s@(FbFSMS { fbState = FbSendPA4 })
+       (FbFSMI { fbLt24Ready = ready })
+    | not ready = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA5 }
+                  , fbFSMO2)
+
+-- Wait for acceptance of second write, then queue write of end high byte
+fbFSM2 s@(FbFSMS { fbState = FbSendPA5 })
+       (FbFSMI { fbLt24Ready = ready })
+    | ready     = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA6
+                      , fbMyActionS = LT24.Write
+                      , fbMyDInS = 0
+                      }
+                  , fbFSMO2)
+
+-- Wait for second write to complete
+fbFSM2 s@(FbFSMS { fbState = FbSendPA6 })
+       (FbFSMI { fbLt24Ready = ready })
+    | not ready = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA7 }
+                  , fbFSMO2)
+
+-- Wait for acceptance of third write, then queue write of end low byte
+fbFSM2 s@(FbFSMS { fbState = FbSendPA7
+                 , fbPageStartS = pageStart })
+       (FbFSMI { fbLt24Ready = ready })
+    | ready     = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA8
+                      , fbMyActionS = LT24.Write
+                      , fbMyDInS = resize $ pageStart + 1
+                      }
+                  , fbFSMO2)
+
+
+-- Wait for third write to complete
+fbFSM2 s@(FbFSMS { fbState = FbSendPA8 })
+       (FbFSMI { fbLt24Ready = ready })
+    | not ready = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA9 }
+                  , fbFSMO2)
+
+-- Wait for acceptance of fourth write, then queue cRAMRD command
+fbFSM2 s@(FbFSMS { fbState = FbSendPA9 })
+       (FbFSMI { fbLt24Ready = ready })
+    | ready     = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbSendPA10
+                      , fbMyActionS = LT24.Command
+                      , fbMyDInS = cRAMRD
+                      }
+                  , fbFSMO2)
+
+-- Wait for fourth write to complete
+fbFSM2 s@(FbFSMS { fbState = FbSendPA10 })
+       (FbFSMI { fbLt24Ready = ready })
+    | not ready = (s, fbFSMO2)
+    | otherwise = ( s { fbState = FbReadCommand }
+                  , fbFSMO2)
+
 {-
- - If previous state = FbIdle:
  -     Wait for acceptance of cRAMRD, then queue dummy read
- - If previous state = FbFinish2:
- -     Wait for acceptance of cRead_Memory_Continue, then queue dummy read
  -}
-fbFSM2 s@(FbFSMS { fbState = FbStart })
+fbFSM2 s@(FbFSMS { fbState = FbReadCommand })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
     | otherwise = ( s { fbState = FbDiscardRead1
@@ -225,7 +303,7 @@ fbFSM2 s@(FbFSMS { fbState = FbStart })
                       }
                   , fbFSMO2)
 
--- Wait for cRAMRD/cRead_Memory_Continue to complete
+-- Wait for cRAMRD to complete
 fbFSM2 s@(FbFSMS { fbState = FbDiscardRead1 })
        (FbFSMI { fbLt24Ready = ready })
     | not ready = (s, fbFSMO2)
@@ -302,7 +380,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
                   , fbFSMO2 { fbAddrMode = FbScratchpad n
                             , fbMyRamDIn = pixel1Eff
                             , fbMyRamWrEn = True
-                            , fbPixelOut = pixel1
+                            , fbPixelVal = pixel1
                             })
     where
         pixel1Eff = if pixel1 == 0 then
@@ -342,7 +420,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead6 n
                             , fbAddrMode = FbScratchpad n
                             , fbMyRamDIn = pixel2Eff
                             , fbMyRamWrEn = True
-                            , fbPixelOut = pixel2
+                            , fbPixelVal = pixel2
                             })
     where
         --state' | n == 127  = FbWriteCmd1
@@ -363,20 +441,14 @@ fbFSM2 s@(FbFSMS { fbState = FbWriteCmd1 }) i
       , fbFSMO2 { fbAddrMode = FbScratchpad 0 })
 
 -- Issue write command
-fbFSM2 s@(FbFSMS { fbState = FbWriteCmd2
-                 , fbStartAddress = startAddress
-                 }) i
+fbFSM2 s@(FbFSMS { fbState = FbWriteCmd2 }) i
     = ( s { fbState = FbWrite1 0
           , fbMyActionS = LT24.Command
-          , fbMyDInS = writeCmd
-          , fbStartAddress = False
+          , fbMyDInS = cRAMWR
           }
       , fbFSMO2 { fbAddrMode = FbScratchpad 0 })
-    where
-        writeCmd | startAddress = cRAMWR
-                 | otherwise    = cWrite_Memory_Continue
 
--- Wait for previous action to be accepted, then queue data write
+-- Wait for cRAMWR to be accepted, then queue data write
 fbFSM2 s@(FbFSMS { fbState = FbWrite1 n })
        (FbFSMI { fbLt24Ready = ready
                , fbMyRamDOut = ramOut
@@ -388,7 +460,7 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite1 n })
                      }
                   , fbFSMO2 { fbAddrMode = FbScratchpad (n+1) })
 
--- Wait for previous action to complete
+-- Wait for cRAMWR to complete
 fbFSM2 s@(FbFSMS { fbState = FbWrite2 n })
        (FbFSMI { fbLt24Ready = ready })
     | not ready = (s, fbFSMO2 { fbAddrMode = FbScratchpad (n+1) })
@@ -419,16 +491,37 @@ fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
         action | coordsDone = LT24.NOP
                | otherwise  = LT24.Command
 
--- Wait for final write to complete, then continue or close up shop
-fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
-       (FbFSMI { fbLt24Ready = ready
+{- 
+ - Wait for final write to complete, then continue or close up shop
+ - If we haven't transferred all pixels yet, transfer next block
+ - Otherwise, if another update is requested, start over at the top
+ - Finally, if no action is needed, return to idle
+ -}
+fbFSM2 s@(FbFSMS { fbState = FbFinish2
+                 , fbPageStartS = pageStartS
+                 })
+       (FbFSMI { fbPageStartI = pageStartI
+               , fbDoUpdateF = doUpdate
+               , fbLt24Ready = ready
                , fbCoordsDone = coordsDone
                })
     | not ready = (s, fbFSMO2)
-    | otherwise = (s { fbState = state' }
-                  , fbFSMO2)
+    | otherwise = (s { fbState = state'
+                     , fbPageStartS = pageStart'
+                     , fbMyActionS = action
+                     , fbMyDInS = cPASET
+                     }
+                  , fbFSMO2 { fbClearDU = clear })
 
     where
-        state' | coordsDone = FbIdle
-               | otherwise  = FbStart
+        state' | not coordsDone || doUpdate = FbSendPA1
+               | otherwise                  = FbIdle
+
+        action | not coordsDone || doUpdate = LT24.Command
+               | otherwise                  = LT24.NOP
+
+        pageStart' | coordsDone = pageStartI
+                   | otherwise  = pageStartS + 2
+
+        clear = coordsDone && doUpdate
 

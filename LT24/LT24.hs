@@ -8,9 +8,10 @@ module LT24.LT24
 
 import CLaSH.Prelude
 
-import qualified Toolbox.ClockScale as CS
+import LT24.Timing
+
+--import qualified Toolbox.ClockScale as CS
 import Toolbox.PackInstances
-import Toolbox.FClk
 import Toolbox.Misc
 
 data Action = NOP | Reset | Command | Write | ReadFM | ReadID
@@ -104,122 +105,74 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  -}
 
 lt24 (action, din, ltdin)
-    = (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
-        (ready, dout, resx, dcx, wrxE, rdx, ltdout, oeE) =
+        (ready, dout, resx, dcx, wrx, rdx, ltdout, oe) =
             (lt24'1 <^> initLt24) (action, din, ltdin)
-        lcd_on = signal H
+        lcdOn = signal H
         csx = signal L
-        oe = register L oeE
-        wrx = register H wrxE
 
-lt24'1 :: ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-          , $(uToFit $(CS.ticksMinPeriodTH fClk 120e-3)))
+lt24'1 :: ( LTState, $(uToFit wLargest), (Bit, Bit, Bit, Bit, Bit, Unsigned 16)
+          , (Action, Unsigned 16), Unsigned 16)
        -> (Action, Unsigned 16, Unsigned 16)
-       -> ( ( (LTState, Unsigned 16, (Bit, Bit, Bit, Bit, Unsigned 16, Bit))
-            , $(uToFit $(CS.ticksMinPeriodTH fClk 120e-3)))
+       -> ( ( LTState, $(uToFit wLargest)
+            , (Bit, Bit, Bit, Bit, Bit, Unsigned 16), (Action, Unsigned 16)
+            , Unsigned 16)
           , (Bool, Unsigned 16, Bit, Bit, Bit, Bit, Unsigned 16, Bit))
 
-lt24'1 s i = (s', (ready, dout, resx, dcx, wrx, rdx, ltdout, oe))
+lt24'1 (st, wait, edgeBufO, cmdBufI, cmdBufO)
+       (action, din, ltdin)
+    = ( (st', wait', edgeBufO', cmdBufI', dout)
+      , (ready, dout, resx, dcx, wrx, rdx, ltdout', oe))
     where
-        s' = lt24'2 s i
-        (is, _) = s
-        (st, dout, obuf) = is
-        ready = st == LTIdle
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
+        (resx, dcx, wrx, rdx, oe, ltdout) = edgeBufO
+        edgeBufO' = (resx', dcx', wrx', rdx', oe', ltdout')
+        (actionD, dinD) = cmdBufI
+        cmdBufI' = (action, din)
+        {- The start of a second phase of a read stores the ltdin from the
+         - display. For things that are not a read, it doesn't matter what
+         - happens.
+         -}
+        dout     | st /= LTIdle && st' == LTIdle = ltdin
+                 | otherwise                     = cmdBufO
+        -- Latches as soon as we leave Idle
+        ltdout' | st == LTIdle && st' /= LTIdle = dinD
+                | otherwise                     = ltdout
 
-initLt24 = ( ( LTIdle
-             , 0     -- dout
-             , ( H   -- resx
-               , H   -- dcx
-               , H   -- wrx
-               , H   -- rdx
-               , 0   -- ltdout
-               , L)) -- oe
-           , 0)      -- wait
+        (st', wait', resx', dcx', wrx', rdx', oe')
+            | wait > 0  = (st, wait - 1, resx, dcx, wrx, rdx, oe)
+            | otherwise = case st of
+                            LTIdle  -> acceptCommand actionD
+                                    --          wait
+                            _       -> (LTIdle, secondPhaseLength st
+                                    --   resx dcx  wrx rdx oe
+                                       , H  , dcx, H , H , oe)
 
-lt24'2 (is, 0   ) i = lt24'3 is i
-lt24'2 (is, wait) _ = (is, wait - 1)
+        ready = st' == LTIdle
 
+initLt24 = ( LTIdle
+           , 0     -- wait
+           , ( H   -- resx
+             , H   -- dcx
+             , H   -- wrx
+             , H   -- rdx
+             , L   -- oe
+             , 0)  -- ltdout
+           , ( NOP -- action
+             , 0)  -- din
+           , 0) -- cmbBufO
 
-{- Template:
-lt24'3 (st     , dout, obuf) (action , din, ltdin) = ( (s'    , dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH fClk
-                                                           355e-9))
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (resx', dcx', wrx', rdx', ltdout', oe')
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
--}
+acceptCommand actionD
+    = case actionD of --     wait                resx dcx wrx rdx oe
+        NOP     -> (LTIdle , 0                 , H  , H , H , H , L)
+        Reset   -> (LTReset, $(intLit wResetL) , L  , H , H , H , L)
+        Command -> (LTWrite, $(intLit wWriteL) , H  , L , L , H , H)
+        Write   -> (LTWrite, $(intLit wWriteL) , H  , H , L , H , H)
+        ReadFM  -> (LTRead , $(intLit wReadLFM), H  , H , H , L , L)
+        ReadID  -> (LTRead , $(intLit wReadLID), H  , H , H , L , L)
 
-lt24'3 (LTIdle , dout, obuf) (NOP    , _  , ltdin) = ( (LTIdle , dout , obuf')
-                                                     , 0          )
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , dcx , H   , H   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTIdle , dout, obuf) (Reset  , din, ltdin) = ( (LTReset, dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 10e-6))
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (L    , H   , H   , H   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTIdle , dout, obuf) (Command, din, ltdin) = ( (LTWrite, dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , L   , L   , H   , din    , H  )
-
-lt24'3 (LTIdle , dout, obuf) (Write  , din, ltdin) = ( (LTWrite, dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , H   , L   , H   , din    , H  )
-
-lt24'3 (LTIdle , dout, obuf) (ReadFM , din, ltdin) = ( (LTRead , dout , obuf')
--- max $(CS.ticksMinPeriodTH fClk   355e-9) ($(CS.ticksMinPeriodTH fClk 355e-9) + 1)
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , H   , H   , L   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTIdle , dout, obuf) (ReadID , din, ltdin) = ( (LTRead , dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , H   , H   , L   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTReset, dout, obuf) (action , din, ltdin) = ( (LTIdle , dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 120e-3))
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , H   , H   , H   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTWrite, dout, obuf) (action , din, ltdin) = ( (LTIdle , dout , obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , dcx , H   , H   , ltdout , H  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-
-lt24'3 (LTRead , dout, obuf) (action , din, ltdin) = ( (LTIdle , dout', obuf')
-                                                     , $(CS.ticksMinPeriodTH
-                                                           fClk 355e-9) + 4)
-    where
-        --      (resx', dcx', wrx', rdx', ltdout', oe')
-        obuf' = (H    , H   , H   , H   , ltdout , L  )
-        (resx, dcx, wrx, rdx, ltdout, oe) = obuf
-        dout' = ltdin
+secondPhaseLength st = case st of
+                         LTReset -> $(intLit wResetH)
+                         LTWrite -> $(intLit wWriteH)
+                         LTRead  -> $(intLit wReadH)
 

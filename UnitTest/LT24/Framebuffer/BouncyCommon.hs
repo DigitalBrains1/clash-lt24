@@ -22,55 +22,32 @@ bouncyBall fb i = o
         button = vhead <$> i
 
         buttonF = tfold (.&.) H (button, doUpdate)
-        period = ($(CS.staticOneShotPeriod fClk 0.025) <^> 1) doUpdate
---        period = signal False
+        period = ($(CS.staticOneShotPeriod fClk 0.002) <^> 1) doUpdate
+--        period = signal True
         doUpdateD = register False doUpdate
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
         (wx, wy, rx, ry) = (unpack . (juggleCoords <$>) . pack) (x,y,xD,yD)
-        (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate)
+        (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess)
             = (drawBall <^> DbInitDisp 0)
                 (wx, wy, rx, ry, accepted, period, buttonF)
 
         (action, din, accepted) = untilAccept (lt24AD, ready)
 
-        ( ready, fbDout, updateDone, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
-            = fb ( action, din, fbAddr, fbDin, fbWrEn
-                 , doUpdate, ltdin)
+        pageStart = (resize . fromBV . toBV) <$> wy :: Signal (Unsigned 8)
+        ( ready, fbDout, updateDone, pixelVal, dout, lcdOn, csx, resx, dcx,
+          wrx, rdx, ltdout, oe)
+--            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate
+--                 , pixelColor, ltdin)
+            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart
+                 , not <$> needAccess, pixelColor, ltdin)
+        -- Yellow, black, red, blue
+        pixelColor = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0xFFE0 ])!)
+                     <$> pixelVal
 
 combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
-
-data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
-             | DbDone
-    deriving (Show, Eq)
-
-data DbI = DbI
-    { dbWx :: Signed 14
-    , dbWy :: Signed 14
-    , dbRx :: Signed 14
-    , dbRy :: Signed 14
-    , dbAccepted :: Bool
-    , dbPeriod :: Bool
-    , dbButtonF :: Bit
-    }
-
-data DbO = DbO
-    { dbLt24AD :: Maybe (LT24.Action, Unsigned 16)
-    , dbFbAddr :: Unsigned 12
-    , dbFbDin :: Unsigned 2
-    , dbFbWrEn :: Bool
-    , dbDoUpdate :: Bool
-    }
-
-dbO = DbO
-    { dbLt24AD = Nothing
-    , dbFbAddr = 0
-    , dbFbDin = 0
-    , dbFbWrEn = False
-    , dbDoUpdate = False
-    }
 
 untilAccept = untilAccept' <^> (LT24.NOP, 0, True)
 untilAccept' (c, d, lastReady) (i, ready)
@@ -118,8 +95,40 @@ juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
         rx = x - wx
         ry = y - wy
 
+data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
+             | DbDone
+    deriving (Show, Eq)
+
+data DbI = DbI
+    { dbWx :: Signed 14
+    , dbWy :: Signed 14
+    , dbRx :: Signed 14
+    , dbRy :: Signed 14
+    , dbAccepted :: Bool
+    , dbPeriod :: Bool
+    , dbButtonF :: Bit
+    }
+
+data DbO = DbO
+    { dbLt24AD :: Maybe (LT24.Action, Unsigned 16)
+    , dbFbAddr :: Unsigned 12
+    , dbFbDin :: Unsigned 2
+    , dbFbWrEn :: Bool
+    , dbDoUpdate :: Bool
+    , dbNeedAccess :: Bool
+    }
+
+dbO = DbO
+    { dbLt24AD = Nothing
+    , dbFbAddr = 0
+    , dbFbDin = 0
+    , dbFbWrEn = False
+    , dbDoUpdate = False
+    , dbNeedAccess = False
+    }
+
 drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
-    = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate))
+    = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess))
     where
         i = DbI { dbWx = wx
                 , dbWy = wy
@@ -135,11 +144,16 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         fbDin = dbFbDin o
         fbWrEn = dbFbWrEn o
         doUpdate = dbDoUpdate o
+        needAccess = dbNeedAccess o
 
-drawBall' s (DbI { dbAccepted = False }) = (s, dbO)
+drawBall' s@(DbInitDisp n) (DbI { dbAccepted = False })
+    = (s, dbO { dbNeedAccess = True })
+
 drawBall' s@(DbInitDisp n) i
     = ( s'
-      , dbO { dbLt24AD = Just ad })
+      , dbO { dbLt24AD = Just ad
+            , dbNeedAccess = True
+            })
     where
         s' | n == 9    = DbWriteRam 0 0
            | otherwise = DbInitDisp (n+1)

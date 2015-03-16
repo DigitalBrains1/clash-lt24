@@ -8,4 +8,13 @@ import CLaSH.Prelude
 import LT24.Framebuffer
 import UnitTest.LT24.Framebuffer.BouncyCommon
 
-topEntity = bouncyBall framebuffer
+topEntity = bouncyBall fb
+
+-- The RMW framebuffer has a "pageStart" argument, but the non-RMW version does
+-- not. Lose the argument.
+fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate , pixelColor
+   , ltdin)
+   = framebuffer ( action, din, fbAddr, fbDin, fbWrEn, doUpdate, pixelColor
+                 , ltdin)
+
+
