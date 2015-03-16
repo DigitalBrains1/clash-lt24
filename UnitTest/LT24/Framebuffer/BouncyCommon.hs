@@ -146,7 +146,7 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         doUpdate = dbDoUpdate o
         needAccess = dbNeedAccess o
 
-drawBall' s@(DbInitDisp n) (DbI { dbAccepted = False })
+drawBall' s (DbI { dbAccepted = False })
     = (s, dbO { dbNeedAccess = True })
 
 drawBall' s@(DbInitDisp n) i
