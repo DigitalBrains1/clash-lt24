@@ -52,6 +52,10 @@ import Toolbox.FClk
  - final state, which is never left, where initLt24 is transparent and
  - dormant.
  -
+ - `i` needs to be large enough to address all initSteps elements, in other
+ - words, (vlength initSteps - 1), plus the two final states -1 and -2. Hence
+ - the uToFit expression in the type declaration below.
+ -
  - `si` is "subindex" and keeps track of the progress of the execution of the
  - current element from initSteps. For instance, it iterates the palette
  - values, and counts ticks in IlWait.
@@ -61,6 +65,7 @@ import Toolbox.FClk
  -
  - Interpretation hint: `im` and `ni` stand for "i minus" and "next i"
  - respectively.
+ -
  -}
 
 initLt24 = initLt24' <^> (fromInteger $ vlength initSteps - 1, 0, L)
@@ -73,10 +78,12 @@ initLt24' :: ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
 initLt24' (i, si, ph) (ready, actionDaisy, lt24dinDaisy)
     = ((i', si', ph'), (action, lt24din, readyDaisy))
     where
+        -- Daisy chain handling
         (action, lt24din, readyDaisy)
             | i == (0 - 2) = (actionDaisy, lt24dinDaisy, ready)
             | i == (0 - 1) = (LT24.NOP   , 0           , True )
             | otherwise    = (myAction   , myLt24din   , True )
+
         (myAction, myLt24din)
             = case step of
                IlL a d       -> (a         , d           )

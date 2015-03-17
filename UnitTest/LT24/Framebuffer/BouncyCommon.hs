@@ -13,6 +13,45 @@ import Toolbox.Misc
 import qualified Toolbox.ClockScale as CS
 import Toolbox.FClk
 
+{-
+ - Make a ball travel at 45° angles and bounce against the sides of the screen.
+ -
+ - `fb` is a generalised version of the two possible framebuffers,
+ - LT24.Framebuffer and LT24.FramebufferRMW. The accompanying Haskell files
+ - specify which one to actually use.
+ -
+ - A blue ball with a red center is drawn at coordinates (x,y). A window of
+ - 64x48 pixels is projected on the full screen. The window is chosen in such a
+ - way, that not only the ball can be drawn, but it also overlaps with the ball
+ - drawn in the previous frame. This is accomplished by `juggleCoords`. If the
+ - window consists of a black background around the ball, this means that the
+ - black will overwrite the previously drawn ball, and the ball appears to
+ - move.
+ -
+ - If, however, the FramebufferRMW version is used and the background is not
+ - black but transparent, then the ball will "streak", leaving a blue trail
+ - wherever it goes. This doesn't look as nice, but it demonstrates the
+ - workings of the transparency that the RMW version offers.
+ -
+ - A 4-colour palette is used. Colours 0 and 1 are black, 2 is red and 3 is
+ - blue. But for FramebufferRMW, 0 indicates "transparent". KEY1 on the
+ - DE0-Nano switches the background between colour 0 and colour 1. When colour
+ - 1 is used, the net effect is that the RMW version functions equally to the
+ - non-RMW version.
+ -
+ - The sampled value of KEY1 is folded over time: `buttonF` is L if `button`
+ - has been L since the last time `doUpdate` was True. The effect is that the
+ - button is considered pressed if it has been pressed between two screen
+ - updates.
+ -
+ - The signal `doUpdate` triggers several things that advance the system to
+ - the next cycle of operation. It primarily triggers the CλaSH framebuffer
+ - component to start transferring pixels to the display, but it also:
+ -  - Resets the one-shot timer that determines when the next frame (with the
+ -    ball in the next position) will be drawn.
+ -  - Triggers `ballPos` to compute the next ball position.
+ -  - Clears the register tracking button state.
+ -}
 bouncyBall fb i = o
     where
         o = ((combineOutput <$>) . pack)
@@ -45,10 +84,28 @@ bouncyBall fb i = o
         pixelColour = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0 ])!)
                      <$> pixelVal
 
+{-
+ - Because CλaSH components should have a single input and a single output
+ - (otherwise they can't be simulated), but tuples in the topEntity produce an
+ - unpractical type in the generated VHDL, all inputs and outputs for the
+ - topEntity are combined into a bitvector. The VHDL wrapper then untangles the
+ - vector.
+ -}
 combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
+{-
+ - Alternative interface to LT24.lt24: `i` = Just "action" to request an
+ - action, and wait for `accepted` to become True.
+ -
+ - Examples: `i` = Just (LT24.Command, cCASET)
+ -           `i` = Just (LT24.Write, 0xCAFE)
+ -
+ - This way of passing actions can make it easier to read; the disadvantage is
+ - you can't burst back-to-back, you always lose a clock cycle in which
+ - `accepted` first becomes True.
+ -}
 untilAccept = untilAccept' <^> (LT24.NOP, 0, True)
 untilAccept' (c, d, lastReady) (i, ready)
     = ((c', d', ready), (c', d', accepted))
@@ -63,6 +120,8 @@ untilAccept' (c, d, lastReady) (i, ready)
 data BallHDir = BpLeft | BpRight
 data BallVDir = BpUp | BpDown
 
+-- When input is True, choose next ball coordinates; change direction when
+-- hitting a border
 ballPos (x, y, v, h) False = ((x , y , v , h ),(x, y))
 ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
     where
@@ -85,9 +144,12 @@ ballPos (x ,y, v, h) True  = ((x', y', v', h'),(x, y))
         xl = 320 - bbox
         yl = 240 - bbox
 
+-- Make previous coordinates available
 delayCoords s (x, y, False) = (s     , s)
 delayCoords s (x, y, True ) = ((x, y), s)
 
+-- Decide a window position that overlaps with both the previous and the
+-- current ball position
 juggleCoords (x, y, xD, yD) = (wx, wy, rx, ry)
     where
         wx = min (320-64) $ min x xD
@@ -127,6 +189,18 @@ dbO = DbO
     , dbNeedAccess = False
     }
 
+{-
+ - Draw a ball in the 64x48 framebuffer with a top-left corner at (rx, ry). The
+ - LT24 controller is told that it should draw this 64x48 framebuffer at
+ - coordinates (wx, wy) (again top-left corner).
+ -
+ - Finally, request the framebuffer component (LT24.Framebuffer or
+ - LT24.FramebufferRMW) to transfer the 64x48 framebuffer to the display.
+ -
+ - When the one-shot timer runs out, start from the top.
+ -
+ - The button chooses the background colour: 0 when not pressed, 1 when pressed.
+ -}
 drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
     = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess))
     where
@@ -146,9 +220,11 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         doUpdate = dbDoUpdate o
         needAccess = dbNeedAccess o
 
+-- Waiting for `untilAccept`
 drawBall' s (DbI { dbAccepted = False })
     = (s, dbO { dbNeedAccess = True })
 
+-- Tell the display controller where to draw the 64x48 framebuffer
 drawBall' s@(DbInitDisp n) i
     = ( s'
       , dbO { dbLt24AD = Just ad
@@ -181,6 +257,16 @@ drawBall' s@(DbInitDisp n) i
         yeL = resize (resize ye :: Unsigned 8)
         yeH = resize (ye `shiftR` 8)
 
+{-
+ - Draw all 64x48 pixels; Pythagoras determines the colour (together with the
+ - button)
+ -
+ - `toHub` refers to the distance from the current coordinate to the hub of the
+ - ball that is to be drawn. (`dbRx`, `dbRy`) is the position of the top-left
+ - corner of the bounding box of the ball, relative to the 64x48 framebuffer.
+ -
+ - When all pixels have been written, signal `doUpdate`.
+ -}
 drawBall' s@(DbWriteRam x y ) i
     = ( s'
       , dbO { dbFbAddr = fromBV $ yBV <++> xBV
@@ -206,10 +292,14 @@ drawBall' s@(DbWriteRam x y ) i
           | dbButtonF i == L                   = 1
           | otherwise                          = 0
 
+-- One-shot timer has finished, next cycle
 drawBall' s@(DbDone) (DbI { dbPeriod = True }) = (DbInitDisp 0, dbO)
 
 drawBall' s i = (s, dbO)
 
+-- Radius of blue ball
 outerRBall = 23
+-- Radius of red center of the ball
 innerRBall = 5
+-- Bounding box of the ball
 bbox = outerRBall * 2 + 1

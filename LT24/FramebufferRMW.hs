@@ -17,6 +17,67 @@ import Toolbox.Blockram2p
 --import Simul.Toolbox.Blockram2p_2_16
 import Toolbox.Misc
 
+{-
+ - Framebuffer interface to LT24; 3 colours and transparency
+ -
+ - The great feature of this framebuffer is that you can keep pixels on the
+ - display as they are. This also means that, even though you are limited to
+ - drawing in three colours at the same time, you can use all 65K colours by
+ - changing your palette on each invocation of `doUpdate`.
+ -
+ - To achieve the "transparency", this framebuffer interface will read out the
+ - current pixel colours from the LT24 display, and on writeback, only replace
+ - those pixels that have a non-zero value in the 64x48 framebuffer.
+ -
+ - To have a bit of temporary storage, the 8192-bits blockram is split in two
+ - parts: 6144 bits store the 64x48 2bpp pixels, and the remaining 2048 bits
+ - are used to store 128 16bpp pixels. The former area is called "framebuffer"
+ - and the latter "scratchpad".
+ -
+ - In more detail, what happens is this:
+ -   - Set LT24 display page address range to the next 2 pages (or rows, or
+ -     y coordinates)
+ -   - Read 128 pixels in 18bpp back from the display; convert each 18bpp pixel
+ -     to its 16bpp direct colour equivalent. Take a look at the 2bpp pixel
+ -     stored in the 64x48 framebuffer; if it is zero, store the old pixel
+ -     colour in the scratchpad. If it is non-zero, store the new pixel colour
+ -     in the scratchpad.
+ -   - Write 128 pixels to the LT24 display from the scratchpad
+ -   - Continue this process until all 24 blocks of 128 pixels are transferred
+ -
+ - So the decision to overwrite a pixel or not is taken while reading the old
+ - pixels. What is stored in the scratchpad is subsequently copied to the
+ - display verbatim.
+ -
+ - Because this implementation shares a lot of traits with LT24.Framebuffer,
+ - only the differences in usage are documented.
+ -
+ - This CλaSH component takes another input:
+ - `pageStart`: The y coordinate of the top-left corner of the 64x48
+ -     framebuffer in the 320x240 display. Or equivalently, the top row.
+ -
+ - Because of this interleaved reading and writing process, this CλaSH
+ - component now unfortunately has to know about the page range (the
+ - y-coordinate range).  This necessarily means that you are limited to a 64x48
+ - framebuffer, and can't decide to use a 16x192 one like you could with
+ - LT24.Framebuffer. Also, the fact that the pixels are read in 18bpp format
+ - (this is unavoidable) means that you have to use a direct-colour mapping,
+ - but that is not a great loss, because surely 65K colours is a lot already.
+ - (Note that it is impossible to have an M9K 2-port blockram with one port 2
+ - bits wide and one port 18 bits wide, which is why I chose to use 16 bpp.)
+ -
+ - Hint for somebody wishing to implement a more elaborate read-modify-write
+ - behaviour: say you wish to have the output of a camera module on the screen,
+ - but want to draw stuff on that video feed. You could use the least
+ - significant bit of green to discern whether the old pixel came from the
+ - video or from your drawing. If it is from the video, replace it with the new
+ - pixel from the camera, if it is from your drawing, keep it. That way you can
+ - draw and remove pixels while a video is running underneath your drawing. It
+ - is certainly possible to change this file a bit to accomodate this extra
+ - logic. It has not been implemented, but I think it's a neat idea and wanted
+ - to share it. The loss of resolution on the green channel is certainly very
+ - minor.
+ -}
 framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
             , pixelColour, ltdin)
     = ( readyDaisy, fbDout, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
@@ -34,6 +95,8 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
         myRamAddr  = ((ramAddr <$>) . pack) (x,y, addrMode)
         (pixel1, pixel2) = (unpack . (pixelLanes <$>) . pack) (x, myRamDOut)
 
+        -- Fold over time with "or", in other words: Output True if `doUpdate`
+        -- was at some time True since the last `clearDU`.
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
         ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords,
           pixelVal, addrMode, myRamDIn, myRamWrEn)
@@ -49,6 +112,13 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
                 ( actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready
                 , lt24DOut , coordsDone, pixel1, pixel2, pixelColour, myRamDOut)
 
+{- Step through all coordinates, stepping when `nextCoords` = True.
+ - Assert `coordsDone` one clock cycle after last coordinate was produced.
+ - Only the even x-coordinates are produced. Because of the way the LT24
+ - display combines two pixels in three words when reading data in its most
+ - efficient mode, all pixels are processed in pairs, and `nextCoords` needs to
+ - advance by two pixels rather than one.
+ -}
 genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
     where
         (x', y') | nextCoords = case (x, y) of
@@ -58,11 +128,23 @@ genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
                  | otherwise  = (x, y)
         coordsDone = (x, y) == (0, 0)
 
+{- Generate a linear RAM address, either from the (x,y) coordinates or from an
+ - index in the scratchpad part, depending on FbAddrMode.
+ - fbFSM now reads from the memory with a 16-bit wide data port, but the (x,y)
+ - coordinates address 2 bit wide pixels. So the memory address discards the 3
+ - least significant bits from the x coordinate. Put differently, 8 consecutive
+ - x coordinates map to a single RAM address.
+ -}
 ramAddr :: (Unsigned 6, Unsigned 6, FbAddrMode)
           -> Unsigned 9
 ramAddr (x,y, FbFramebuffer ) = fromBV $ toBV y <++> vtakeI (toBV x)
 ramAddr (_,_, FbScratchpad n) = resize n + 384
 
+{- Pick two 2-bit lanes from the 16-bit memory word.
+ - The lowest 3 bits of the x coordinate address an even-numbered pixel in the
+ - 16-bit word (so actually the least significant bit is always 0). Return that
+ - pixel and the odd-numbered pixel following it.
+ -}
 pixelLanes :: (Unsigned 6, Unsigned 16)
            -> (Unsigned 2, Unsigned 2)
 pixelLanes (x, pixelW) = (pixel1, pixel2)
@@ -84,6 +166,7 @@ data FbState = FbIdle | FbSendPA1 | FbSendPA2 | FbSendPA3 | FbSendPA4
 
 data FbAddrMode = FbFramebuffer | FbScratchpad (Unsigned 7)
 
+-- (S)tate for fbFSM
 data FbFSMS = FbFSMS
     { fbState :: FbState
     , fbPageStartS :: Unsigned 8
@@ -96,6 +179,7 @@ data FbFSMS = FbFSMS
     }
     deriving (Show, Eq)
 
+-- (I)nput for fbFSM
 data FbFSMI = FbFSMI
     { fbState' :: FbState
     , fbActionDaisy :: LT24.Action
@@ -113,12 +197,14 @@ data FbFSMI = FbFSMI
     , fbMyDInI :: Unsigned 16
     }
 
+-- (O)utput for fbFSM1
 data FbFSMO1 = FbFSMO1
     { fbReadyDaisy :: Bool
     , fbLt24Action :: LT24.Action
     , fbLt24DIn :: Unsigned 16
     }
 
+-- (O)utput for fbFSM2
 data FbFSMO2 = FbFSMO2
     { fbClearDU :: Bool
     , fbNextCoords :: Bool
@@ -128,6 +214,7 @@ data FbFSMO2 = FbFSMO2
     , fbMyRamWrEn :: Bool
     }
 
+-- Default values for outputs
 fbFSMO2 = FbFSMO2
     { fbClearDU = False
     , fbNextCoords = False
@@ -137,6 +224,21 @@ fbFSMO2 = FbFSMO2
     , fbMyRamWrEn = False
     }
 
+{- The finite state machine that does all the real work
+ -
+ - This function merely wraps fbFSM1 and fbFSM2, passing all the signals from
+ - and to, and even between them.
+ -
+ - That is, the inputs fbState', fbMyActionI and fbMyDinI, which are an input
+ - to fbFSM1, are actually passed from fbFSM2 (where they happen to be part of
+ - the state).
+ -
+ - The output `updateDone` is computed here. All the other signals are only
+ - "converted" from a CλaSH component-style tuple to a record format, and
+ - vice-versa. That way, record syntax can be used for pattern matching,
+ - supplying default values, and record update syntax for the state, to enhance
+ - the readability of the functions fbFSM1 and fbFSM2.
+ -}
 fbFSM s
       (actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready, lt24DOut
       , coordsDone , pixel1, pixel2, pixelColour, myRamDOut)
@@ -176,7 +278,7 @@ fbFSM s
         o1 = fbFSM1 i
         (s2', o2) = fbFSM2 s i
 
--- Daisy chain handler
+-- Daisy chain handler: when we're not using the LT24, let the caller access it
 fbFSM1 i@(FbFSMI { fbState' = FbIdle })
     = FbFSMO1 { fbReadyDaisy = fbLt24Ready i
               , fbLt24Action = fbActionDaisy i
@@ -187,9 +289,34 @@ fbFSM1 i = FbFSMO1 { fbReadyDaisy = True
                    , fbLt24DIn = fbMyDInI i
                    }
 
------- doUpdate handler ------
 
--- lt24 available and update requested; go!
+{-
+ - doUpdate handler
+ -
+ - Actions for the LT24.LT24 are queued as soon as the previous action is
+ - accepted. This way, maximum throughput is achieved even on low clock
+ - frequencies.
+ -
+ - The LT24 display transfers two pixels in three words, with the middle word
+ - thus containing part of the first, and part of the second pixel. So all
+ - pixels are processed in pairs of two.
+ -
+ - During reading of the LT24 display, we also need to read from the
+ - framebuffer portion of the RAM and write to the scratchpad portion. Because
+ - a RAM access takes two cycles to be available on the output port (there are
+ - registers in the blockram), the two pixels that are being processed are read
+ - in the same cycle, and the second pixel is temporarily stored in a register
+ - in the state. This way, the scratchpad write does not interfere with reading
+ - the pixels from the framebuffer.
+ -}
+
+{-
+ - The state machine starts in FbIdle, waiting for an update request. To
+ - process the update, LT24.LT24 needs to have finished whatever it was doing
+ - before through the daisy chain. Once it is idle and an update is requested:
+ - Clear `doUpdateF`. Queue cPASET command to the LT24 display. Store the
+ - pageStart value from the input.
+ -}
 fbFSM2 s@(FbFSMS { fbState = FbIdle }) i@(FbFSMI { fbDoUpdateF = True
                                                  , fbLt24Ready = True
                                                  , fbPageStartI = pageStart })
@@ -204,7 +331,11 @@ fbFSM2 s@(FbFSMS { fbState = FbIdle }) i@(FbFSMI { fbDoUpdateF = True
 fbFSM2 s@(FbFSMS { fbState = FbIdle }) i
     = (s, fbFSMO2)
 
--- Wait for acceptance of cPASET, then queue write of start high byte
+{- Wait for acceptance of cPASET, then queue write of start high byte
+ - Since there are only 240 rows, the high byte is always 0.
+ -
+ - This whole sequence of FbSendPA states could be rewritten in a nicer form.
+ -}
 fbFSM2 s@(FbFSMS { fbState = FbSendPA1 })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
@@ -292,9 +423,7 @@ fbFSM2 s@(FbFSMS { fbState = FbSendPA10 })
     | otherwise = ( s { fbState = FbReadCommand }
                   , fbFSMO2)
 
-{-
- -     Wait for acceptance of cRAMRD, then queue dummy read
- -}
+-- Wait for acceptance of cRAMRD, then queue dummy read
 fbFSM2 s@(FbFSMS { fbState = FbReadCommand })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
@@ -326,9 +455,7 @@ fbFSM2 s@(FbFSMS { fbState = FbDiscardRead3 })
     | otherwise = ( s { fbState = FbRead1 0 }
                   , fbFSMO2)
 
-{-
- - Wait for first real read acceptance, queue second read
- -}
+-- Wait for first real read acceptance, queue second read
 fbFSM2 s@(FbFSMS { fbState = FbRead1 n })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
@@ -361,7 +488,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead3 n })
                       }
                   , fbFSMO2)
 
--- Wait for second read to complete, compute first pixel
+-- Wait for second read to complete, compute and store first pixel
 fbFSM2 s@(FbFSMS { fbState = FbRead4 n
                  , fbR1 = r1
                  , fbG1 = g1
@@ -391,7 +518,11 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
         b1 = pal6bTo5b $ resize $ dat `shiftR` 10
         r2 = pal6bTo5b $ resize $ dat `shiftR` 2
 
--- Wait for third read to be accepted, queue next action
+{- 
+ - Wait for third read to be accepted.
+ - If we've processed the whole batch of 128 pixels, don't queue another
+ - action, otherwise queue the next read.
+ -}
 fbFSM2 s@(FbFSMS { fbState = FbRead5 n })
        (FbFSMI { fbLt24Ready = ready })
     | ready     = (s, fbFSMO2)
@@ -403,7 +534,11 @@ fbFSM2 s@(FbFSMS { fbState = FbRead5 n })
         nextAction | n == 127  = LT24.NOP
                    | otherwise = LT24.ReadFM
 
--- Wait for third read to complete, compute second pixel
+{- 
+ - Wait for third read to complete, compute and store second pixel.
+ - If we've processed the whole batch of 128 pixels, continue to the write
+ - phase. Otherwise, continue with the next read.
+ -}
 fbFSM2 s@(FbFSMS { fbState = FbRead6 n
                  , fbPixel2Buf = pixel2
                  , fbR2 = r2
@@ -469,9 +604,9 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite2 n })
                | otherwise = FbWrite1 (n+1)
 
 {- 
- - Wait for final write to be accepted
- - If we're not done yet, queue read command
- - Otherwise, finish up (fbMyDInS will be ignored)
+ - Wait for final write to be accepted.
+ - If we're not done yet, queue read command.  Otherwise, finish up (fbMyDInS
+ - will be ignored).
  -}
 fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
        (FbFSMI { fbLt24Ready = ready
@@ -489,10 +624,10 @@ fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
                | otherwise  = LT24.Command
 
 {- 
- - Wait for final write to complete, then continue or close up shop
+ - Wait for final write to complete, then continue or close up shop.
  - If we haven't transferred all pixels yet, transfer next block
- - Otherwise, if another update is requested, start over at the top
- - Finally, if no action is needed, return to idle
+ - Otherwise, if another update is requested, start over at the top.
+ - Finally, if no action is needed, return to idle.
  -}
 fbFSM2 s@(FbFSMS { fbState = FbFinish2
                  , fbPageStartS = pageStartS

@@ -29,7 +29,7 @@ initSteps =  IlL LT24.Reset   0
           :> IlL LT24.Command cMADCTL
           :> IlL LT24.Write   232           -- Alternate row address order,
                                             -- alternate column address order,
-                                            -- row / column exchange
+                                            -- row / column exchange,
                                             -- BGR subpixel order
           :> IlL LT24.Command cCOLMOD
           :> IlL LT24.Write   5             -- 16bpp MCU interface

@@ -8,6 +8,11 @@ import CLaSH.Prelude
 import LT24.Framebuffer
 import UnitTest.LT24.Framebuffer.BouncyCommon
 
+{-
+ - Make a ball travel at 45° angles and bounce against the sides of the screen.
+ -
+ - This uses LT24.Framebuffer
+ -}
 topEntity = bouncyBall fb
 
 -- The RMW framebuffer has a "pageStart" argument, but the non-RMW version does
