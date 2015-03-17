@@ -118,19 +118,19 @@ fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColor)
                    , fbMyDinI = fbMyDinS s2'
                    }
 
-        (s1', o1) = fbFSM1 s i
+        o1 = fbFSM1 i
         (s2', o2) = fbFSM2 s i
 
 -- Daisy chain handler
-fbFSM1 s i@(FbFSMI { fbState' = FbIdle })
-    = (s, FbFSMO1 { fbReadyDaisy = fbLt24Ready i
-                  , fbLt24Action = fbActionDaisy i
-                  , fbLt24Din = fbDinDaisy i
-                  })
-fbFSM1 s i = (s, FbFSMO1 { fbReadyDaisy = True
-                         , fbLt24Action = fbMyActionI i
-                         , fbLt24Din = fbMyDinI i
-                         })
+fbFSM1 i@(FbFSMI { fbState' = FbIdle })
+    = FbFSMO1 { fbReadyDaisy = fbLt24Ready i
+              , fbLt24Action = fbActionDaisy i
+              , fbLt24Din = fbDinDaisy i
+              }
+fbFSM1 i = FbFSMO1 { fbReadyDaisy = True
+                   , fbLt24Action = fbMyActionI i
+                   , fbLt24Din = fbMyDinI i
+                   }
 
 -- doUpdate handler
 fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbLt24Ready = False})
