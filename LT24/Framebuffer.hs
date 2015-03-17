@@ -145,11 +145,11 @@ fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
       , fbFSMO2 { fbClearDU = True })
 
 fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
-       (FbFSMI { fbLt24Ready = True })
-    = (s { fbState = FbIdle }, fbFSMO2)
-fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
        (FbFSMI { fbLt24Ready = False })
     = (s, fbFSMO2)
+fbFSM2 s@(FbFSMS { fbState = FbFinish2 })
+       (FbFSMI { fbLt24Ready = True })
+    = (s { fbState = FbIdle }, fbFSMO2)
 
 fbFSM2 s@(FbFSMS { fbWaitState = FbWaitDone })
        (FbFSMI { fbLt24Ready = False })
