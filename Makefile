@@ -32,3 +32,4 @@ clean:
 	find . -name '*.hi' -type f -delete
 	rm -rf vhdl/
 	rm -f make.log
+	rm -f Main
