@@ -173,19 +173,19 @@ fbFSM s
                    , fbMyDInI = fbMyDInS s2'
                    }
 
-        (s1', o1) = fbFSM1 s i
+        o1 = fbFSM1 i
         (s2', o2) = fbFSM2 s i
 
 -- Daisy chain handler
-fbFSM1 s i@(FbFSMI { fbState' = FbIdle })
-    = (s, FbFSMO1 { fbReadyDaisy = fbLt24Ready i
-                  , fbLt24Action = fbActionDaisy i
-                  , fbLt24DIn = fbDInDaisy i
-                  })
-fbFSM1 s i = (s, FbFSMO1 { fbReadyDaisy = True
-                         , fbLt24Action = fbMyActionI i
-                         , fbLt24DIn = fbMyDInI i
-                         })
+fbFSM1 i@(FbFSMI { fbState' = FbIdle })
+    = FbFSMO1 { fbReadyDaisy = fbLt24Ready i
+              , fbLt24Action = fbActionDaisy i
+              , fbLt24DIn = fbDInDaisy i
+              }
+fbFSM1 i = FbFSMO1 { fbReadyDaisy = True
+                   , fbLt24Action = fbMyActionI i
+                   , fbLt24DIn = fbMyDInI i
+                   }
 
 ------ doUpdate handler ------
 
