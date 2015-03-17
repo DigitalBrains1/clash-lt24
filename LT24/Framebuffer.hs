@@ -15,8 +15,8 @@ import Toolbox.Blockram2p
 --import Simul.Toolbox.Blockram2p_2_2
 import Toolbox.Misc
 
-framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, pixelColor
-            , ltdin)
+framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate
+            , pixelColour, ltdin)
     = ( readyDaisy, fbDout, updateDone, pixelVal, lt24Dout, lcdOn, csx, resx
       , dcx, wrx, rdx, ltdout, oe)
     where
@@ -39,7 +39,7 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate, pixelColor
                                 , fbMyDinS = 0
                                 })
                 ( actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone
-                , pixelColor)
+                , pixelColour)
 
 genCoords (x, y) nextCoords = ((x', y'), (x', y', coordsDone))
     where
@@ -75,7 +75,7 @@ data FbFSMI = FbFSMI
     , fbDoUpdateF :: Bool
     , fbLt24Ready :: Bool
     , fbCoordsDone :: Bool
-    , fbPixelColor :: Unsigned 16
+    , fbPixelColour :: Unsigned 16
     , fbMyActionI :: LT24.Action
     , fbMyDinI :: Unsigned 16
     }
@@ -95,7 +95,7 @@ fbFSMO2 = FbFSMO2
     { fbClearDU = False
     , fbNextCoords = False    }
 
-fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColor)
+fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColour)
     = (s', (readyDaisy, updateDone, clearDU, lt24Action, lt24Din
            , nextCoords))
     where
@@ -113,7 +113,7 @@ fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColor)
                    , fbDoUpdateF = doUpdateF
                    , fbLt24Ready = lt24Ready
                    , fbCoordsDone = coordsDone
-                   , fbPixelColor = pixelColor
+                   , fbPixelColour = pixelColour
                    , fbMyActionI = fbMyActionS s2'
                    , fbMyDinI = fbMyDinS s2'
                    }
@@ -165,7 +165,7 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite }) i
     = ( s { fbState = if fbCoordsDone i then FbFinish1 else FbWrite
           , fbWaitState = FbWaitDone
           , fbMyActionS = LT24.Write
-          , fbMyDinS = fbPixelColor i
+          , fbMyDinS = fbPixelColour i
           }
       , fbFSMO2 { fbNextCoords = True })
 

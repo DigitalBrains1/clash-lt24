@@ -28,10 +28,6 @@ instance Lift Action where
 data LTState = LTIdle | LTReset | LTRead | LTWrite
     deriving (Show, Eq)
 
--- TODO: Proper timing
--- TODO: ltdout is apparently delayed too much
--- TODO: Proper buffering to maximally shorten combinatorial path
-
 {-
  - Interface to the LT24 LC-display
  -

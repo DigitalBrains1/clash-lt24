@@ -18,7 +18,7 @@ import Toolbox.Blockram2p
 import Toolbox.Misc
 
 framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
-            , pixelColor, ltdin)
+            , pixelColour, ltdin)
     = ( readyDaisy, fbDout, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
       , dcx, wrx, rdx, ltdout, oe)
     where
@@ -47,7 +47,7 @@ framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
                                 , fbMyDInS = 0
                                 })
                 ( actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready
-                , lt24DOut , coordsDone, pixel1, pixel2, pixelColor, myRamDOut)
+                , lt24DOut , coordsDone, pixel1, pixel2, pixelColour, myRamDOut)
 
 genCoords (x, y) nextCoords = ((x', y'), (x, y, coordsDone))
     where
@@ -107,7 +107,7 @@ data FbFSMI = FbFSMI
     , fbCoordsDone :: Bool
     , fbPixel1 :: Unsigned 2
     , fbPixel2 :: Unsigned 2
-    , fbPixelColor :: Unsigned 16
+    , fbPixelColour :: Unsigned 16
     , fbMyRamDOut :: Unsigned 16
     , fbMyActionI :: LT24.Action
     , fbMyDInI :: Unsigned 16
@@ -139,7 +139,7 @@ fbFSMO2 = FbFSMO2
 
 fbFSM s
       (actionDaisy, dInDaisy, pageStart, doUpdateF, lt24Ready, lt24DOut
-      , coordsDone , pixel1, pixel2, pixelColor, myRamDOut)
+      , coordsDone , pixel1, pixel2, pixelColour, myRamDOut)
     = (s', ( readyDaisy, updateDone, clearDU, lt24Action, lt24DIn
            , nextCoords, pixelVal, addrMode, myRamDIn, myRamWrEn))
     where
@@ -167,7 +167,7 @@ fbFSM s
                    , fbCoordsDone = coordsDone
                    , fbPixel1 = pixel1
                    , fbPixel2 = pixel2
-                   , fbPixelColor = pixelColor
+                   , fbPixelColour = pixelColour
                    , fbMyRamDOut = myRamDOut
                    , fbMyActionI = fbMyActionS s2'
                    , fbMyDInI = fbMyDInS s2'
@@ -370,7 +370,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
                , fbLt24DOut = dat
                , fbPixel1 = pixel1
                , fbPixel2 = pixel2
-               , fbPixelColor = pixelColor
+               , fbPixelColour = pixelColour
                })
     | not ready = (s, fbFSMO2)
     | otherwise = ( s { fbState = FbRead5 (n+1)
@@ -384,10 +384,10 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
                             })
     where
         pixel1Eff = if pixel1 == 0 then
-                      oldPixelColor
+                      oldPixelColour
                     else
-                      pixelColor
-        oldPixelColor = pal555To16bpp (r1, g1, b1)
+                      pixelColour
+        oldPixelColour = pal555To16bpp (r1, g1, b1)
         b1 = pal6bTo5b $ resize $ dat `shiftR` 10
         r2 = pal6bTo5b $ resize $ dat `shiftR` 2
 
@@ -410,7 +410,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead6 n
                  })
        (FbFSMI { fbLt24Ready = ready
                , fbLt24DOut = dat
-               , fbPixelColor = pixelColor
+               , fbPixelColour = pixelColour
                })
     | not ready = (s, fbFSMO2)
     | otherwise = ( s { fbState = state'
@@ -425,10 +425,10 @@ fbFSM2 s@(FbFSMS { fbState = FbRead6 n
         state' | n == 127  = FbWriteCmd1
                | otherwise = FbRead1 (n + 1)
         pixel2Eff = if pixel2 == 0 then
-                      oldPixelColor
+                      oldPixelColour
                     else
-                      pixelColor
-        oldPixelColor = pal555To16bpp (r2, g2, b2)
+                      pixelColour
+        oldPixelColour = pal555To16bpp (r2, g2, b2)
         g2 = resize $ dat `shiftR` 10
         b2 = pal6bTo5b $ resize $ dat `shiftR` 2
 

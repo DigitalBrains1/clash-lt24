@@ -19,7 +19,7 @@ data IlStep = IlL LT24.Action (Unsigned 16) | IlDoPalette5b | IlDoPalette6b
 {-
  - These are the steps necessary to initialize the LT24's controller.
  -
- - It is initialized in a 16bpp mode with a direct color mapping. The
+ - It is initialized in a 16bpp mode with a direct colour mapping. The
  - coordinates are chosen such that if you have the LT24 module oriented with
  - the silkscreen text "terasIC LT24" upright, then the coordinates (x,y) are
  - (0,0) top-left, (319,0) top-right, (0,239) bottom-left and (319,239)

@@ -30,8 +30,8 @@ import Toolbox.FClk
  -
  -      IlL a d        -- Literal: send an action a and din d to lt24.
  -      IlDoPalette5b  -- Write the 32 palette values that initialise the
- -                        palette of a subpixel to a direct color mapping.
- -      IlDoPalette6b  -- Write the 64 palette values for green
+ -                        palette of a subpixel to a direct colour mapping.
+ -      IlDoPalette6b  -- Write the 64 direct colour palette values for green
  -      IlWait n       -- Wait for n clockticks
  -      IlWipeFb       -- Write 320*240 (=76,800) zeroes to the display
  -
@@ -41,9 +41,9 @@ import Toolbox.FClk
  -
  - It is designed to be daisy-chained with the component that handles the
  - display after initialisation. As long as initialisation is running, the
- - daisy-chained component never sees its command being accepted (by ready going
- - to False). After the initialization is done, initLt24 is transparent, simply
- - passing the commands and data from the daisy-chained component.
+ - daisy-chained component never sees its command being accepted (by ready
+ - going to False). After the initialization is done, initLt24 is transparent,
+ - simply passing the commands and data from the daisy-chained component.
  -
  - `i` indexes initSteps. After running from the highest-numbered, i.e.,
  - first, element down to 0, there are two further final steps which are
