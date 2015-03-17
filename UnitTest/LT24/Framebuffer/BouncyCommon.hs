@@ -102,10 +102,10 @@ bouncyBall fb i = o
         pageStart = (resize . fromBV . toBV) <$> wy :: Signal (Unsigned 8)
         ( ready, fbDout, updateDone, pixelVal, dout, lcdOn, csx, resx, dcx,
           wrx, rdx, ltdout, oe)
---            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate
---                 , pixelColour, ltdin)
-            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart
-                 , not <$> needAccess, pixelColour, ltdin)
+            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate
+                 , pixelColour, ltdin)
+--            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart
+--                 , not <$> needAccess, pixelColour, ltdin)
         -- Black, black, red, blue
         pixelColour = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0 ])!)
                      <$> pixelVal
