@@ -43,9 +43,9 @@ topEntity = bouncyBall fb
 
 -- The RMW framebuffer has a "pageStart" argument, but the non-RMW version does
 -- not. Lose the argument.
-fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate , pixelColour
+fb ( action, din, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate , pixelColour
    , ltdin)
-   = framebuffer ( action, din, fbAddr, fbDin, fbWrEn, doUpdate, pixelColour
+   = framebuffer ( action, din, fbAddr, fbDIn, fbWrEn, doUpdate, pixelColour
                  , ltdin)
 
 

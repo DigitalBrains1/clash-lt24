@@ -133,7 +133,7 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  - `dout` however is not registered. cmdBufO does maintain its value in between
  - reads, but on a read, `dout` comes straight from ltdin.
  -
- - The D in the names `actionD` and `dinD` means "Delayed"; because of the
+ - The D in the names `actionD` and `dInD` means "Delayed"; because of the
  - register, they lag with one cycle with regard to the inputs with that name.
  -
  - Timing is central to this component. Every change is usually followed by a
@@ -170,7 +170,7 @@ lt24'1 (st, wait, edgeBufO, cmdBufI, cmdBufO)
     where
         (resx, dcx, wrx, rdx, oe, ltdout) = edgeBufO
         edgeBufO' = (resx', dcx', wrx', rdx', oe', ltdout')
-        (actionD, dinD) = cmdBufI
+        (actionD, dInD) = cmdBufI
         cmdBufI' = (action, din)
         {- The start of a second phase of a read stores the ltdin from the
          - display. For things that are not a read, it doesn't matter what
@@ -179,7 +179,7 @@ lt24'1 (st, wait, edgeBufO, cmdBufI, cmdBufO)
         dout     | st /= LTIdle && st' == LTIdle = ltdin
                  | otherwise                     = cmdBufO
         -- Latches as soon as we leave Idle
-        ltdout' | st == LTIdle && st' /= LTIdle = dinD
+        ltdout' | st == LTIdle && st' /= LTIdle = dInD
                 | otherwise                     = ltdout
 
         (st', wait', resx', dcx', wrx', rdx', oe')

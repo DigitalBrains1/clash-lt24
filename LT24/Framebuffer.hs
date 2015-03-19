@@ -54,8 +54,8 @@ import Toolbox.Misc
  -
  - Inputs:
  -   `actionDaisy`: Daisy-chained actions for LT24.LT24
- -   `dinDaisy`: The same for data
- -   `fbAddr`, `fbDin`, `fbWrEn`: Blockram access for the caller. See
+ -   `dInDaisy`: The same for data
+ -   `fbAddr`, `fbDIn`, `fbWrEn`: Blockram access for the caller. See
  -       Toolbox.Blockram2p for discussion of the signals; these are connected
  -       to port A of the 2-port blockram. It provides access to 3072 words of
  -       2 bits. Each word is one pixel. Given a coordinate (x,y) in the range
@@ -112,7 +112,7 @@ import Toolbox.Misc
  -
  - Outputs:
  -   `readyDaisy`: Daisy-chained ready signal.
- -   `fbDout`: Blockram access for the caller: data read from the blockram. See
+ -   `fbDOut`: Blockram access for the caller: data read from the blockram. See
  -       blockram inputs above for more discussion.
  -   `updateDone`: Will be True for one clock cycle when the LT24 display was
  -       succesfully updated with the new framebuffer data. When `doUpdate` was
@@ -121,7 +121,7 @@ import Toolbox.Misc
  -       `doUpdate` and wait for `updateDone` without consideration for whether
  -       there was already an update in progress.
  -   `pixelVal`: See `pixelColour` input.
- -   `lt24Dout`, `lcdOn`, `csx`, `resx`, `dcx`, `wrx`, `rdx`, `ltdout`, `oe`:
+ -   `lt24DOut`, `lcdOn`, `csx`, `resx`, `dcx`, `wrx`, `rdx`, `ltdout`, `oe`:
  -       See LT24.LT24.
  -
  - Note that this version of `framebuffer` is agnostic about coordinates; you
@@ -130,18 +130,18 @@ import Toolbox.Misc
  - command. The RMW variant in LT24.FramebufferRMW however, unfortunately has
  - to know about coordinates.
  -}
-framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate
+framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, doUpdate
             , pixelColour, ltdin)
-    = ( readyDaisy, fbDout, updateDone, pixelVal, lt24Dout, lcdOn, csx, resx
+    = ( readyDaisy, fbDOut, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
       , dcx, wrx, rdx, ltdout, oe)
     where
 
-        (fbDout, pixelVal) = blockram2p d12 d12 d2 d2
-                               (fbAddr, fbDin, fbWrEn, myRamAddr, signal 0
+        (fbDOut, pixelVal) = blockram2p d12 d12 d2 d2
+                               (fbAddr, fbDIn, fbWrEn, myRamAddr, signal 0
                                , signal False)
 
-        (lt24Ready, lt24Dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe) =
-            lt24WithInit (lt24Action, lt24Din, ltdin)
+        (lt24Ready, lt24DOut, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+            lt24WithInit (lt24Action, lt24DIn, ltdin)
 
         (x,y, coordsDone) = (genCoords <^> (0, 0)) nextCoords
         myRamAddr  = ((ramAddr <$>) . pack) (x,y)
@@ -149,13 +149,13 @@ framebuffer (actionDaisy, dinDaisy, fbAddr, fbDin, fbWrEn, doUpdate
         -- Fold over time with "or", in other words: Output True if `doUpdate`
         -- was at some time True since the last `clearDU`.
         doUpdateF = tfoldD (||) False (doUpdate, clearDU)
-        (readyDaisy, updateDone, clearDU, lt24Action, lt24Din, nextCoords)
+        (readyDaisy, updateDone, clearDU, lt24Action, lt24DIn, nextCoords)
             = (fbFSM <^> FbFSMS { fbState = FbIdle
                                 , fbWaitState = FbWaitDone
                                 , fbMyActionS = LT24.NOP
-                                , fbMyDinS = 0
+                                , fbMyDInS = 0
                                 })
-                ( actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone
+                ( actionDaisy, dInDaisy, doUpdateF, lt24Ready, coordsDone
                 , pixelColour)
 
 -- Step through all coordinates, stepping when `nextCoords` = True.
@@ -185,7 +185,7 @@ data FbFSMS = FbFSMS
     { fbState :: FbState
     , fbWaitState :: FbWaitState
     , fbMyActionS :: LT24.Action
-    , fbMyDinS :: Unsigned 16
+    , fbMyDInS :: Unsigned 16
     }
     deriving (Show, Eq)
 
@@ -193,20 +193,20 @@ data FbFSMS = FbFSMS
 data FbFSMI = FbFSMI
     { fbState' :: FbState
     , fbActionDaisy :: LT24.Action
-    , fbDinDaisy :: Unsigned 16
+    , fbDInDaisy :: Unsigned 16
     , fbDoUpdateF :: Bool
     , fbLt24Ready :: Bool
     , fbCoordsDone :: Bool
     , fbPixelColour :: Unsigned 16
     , fbMyActionI :: LT24.Action
-    , fbMyDinI :: Unsigned 16
+    , fbMyDInI :: Unsigned 16
     }
 
 -- (O)utput for fbFSM1
 data FbFSMO1 = FbFSMO1
     { fbReadyDaisy :: Bool
     , fbLt24Action :: LT24.Action
-    , fbLt24Din :: Unsigned 16
+    , fbLt24DIn :: Unsigned 16
     }
 
 -- (O)utput for fbFSM2
@@ -225,7 +225,7 @@ fbFSMO2 = FbFSMO2
  - This function merely wraps fbFSM1 and fbFSM2, passing all the signals from
  - and to, and even between them.
  -
- - That is, the inputs fbState', fbMyActionI and fbMyDinI, which are an input
+ - That is, the inputs fbState', fbMyActionI and fbMyDInI, which are an input
  - to fbFSM1, are actually passed from fbFSM2 (where they happen to be part of
  - the state).
  -
@@ -235,13 +235,13 @@ fbFSMO2 = FbFSMO2
  - supplying default values, and record update syntax for the state, to enhance
  - the readability of the functions fbFSM1 and fbFSM2.
  -}
-fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColour)
-    = (s', (readyDaisy, updateDone, clearDU, lt24Action, lt24Din
+fbFSM s (actionDaisy, dInDaisy, doUpdateF, lt24Ready, coordsDone, pixelColour)
+    = (s', (readyDaisy, updateDone, clearDU, lt24Action, lt24DIn
            , nextCoords))
     where
         s' = s2'
         readyDaisy = fbReadyDaisy o1
-        lt24Din = fbLt24Din o1
+        lt24DIn = fbLt24DIn o1
         nextCoords = fbNextCoords o2
         updateDone = fbState s2' == FbIdle
         clearDU = fbClearDU o2
@@ -249,13 +249,13 @@ fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColour)
 
         i = FbFSMI { fbState' = fbState s2'
                    , fbActionDaisy = actionDaisy
-                   , fbDinDaisy = dinDaisy
+                   , fbDInDaisy = dInDaisy
                    , fbDoUpdateF = doUpdateF
                    , fbLt24Ready = lt24Ready
                    , fbCoordsDone = coordsDone
                    , fbPixelColour = pixelColour
                    , fbMyActionI = fbMyActionS s2'
-                   , fbMyDinI = fbMyDinS s2'
+                   , fbMyDInI = fbMyDInS s2'
                    }
 
         o1 = fbFSM1 i
@@ -265,11 +265,11 @@ fbFSM s (actionDaisy, dinDaisy, doUpdateF, lt24Ready, coordsDone, pixelColour)
 fbFSM1 i@(FbFSMI { fbState' = FbIdle })
     = FbFSMO1 { fbReadyDaisy = fbLt24Ready i
               , fbLt24Action = fbActionDaisy i
-              , fbLt24Din = fbDinDaisy i
+              , fbLt24DIn = fbDInDaisy i
               }
 fbFSM1 i = FbFSMO1 { fbReadyDaisy = True
                    , fbLt24Action = fbMyActionI i
-                   , fbLt24Din = fbMyDinI i
+                   , fbLt24DIn = fbMyDInI i
                    }
 
 {-
@@ -315,7 +315,7 @@ fbFSM2 s@(FbFSMS { fbState = FbIdle }) (FbFSMI { fbDoUpdateF = True
     = ( s { fbState = FbWrite
           , fbWaitState = FbWaitAccept
           , fbMyActionS = LT24.Command
-          , fbMyDinS = cRAMWR
+          , fbMyDInS = cRAMWR
           }
       , fbFSMO2 { fbClearDU = True })
 
@@ -369,7 +369,7 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite }) i
     = ( s { fbState = if fbCoordsDone i then FbFinish1 else FbWrite
           , fbWaitState = FbWaitDone
           , fbMyActionS = LT24.Write
-          , fbMyDinS = fbPixelColour i
+          , fbMyDInS = fbPixelColour i
           }
       , fbFSMO2 { fbNextCoords = True })
 
@@ -388,7 +388,7 @@ fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
     = ( s { fbState = FbWrite
           , fbWaitState = FbWaitDone
           , fbMyActionS = LT24.Command
-          , fbMyDinS = cRAMWR
+          , fbMyDInS = cRAMWR
           }
       , fbFSMO2 { fbClearDU = True })
 fbFSM2 s@(FbFSMS { fbState = FbFinish1 }) i

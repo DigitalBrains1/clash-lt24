@@ -50,7 +50,7 @@ import Control.Applicative
  -
  - The inputs are:
  - `aAddr` - Address bus port A
- - `aDin`  - Data in port A
+ - `aDIn`  - Data in port A
  - `aWrEn` - Write enable for port A (read is always enabled)
  - ... and then similar for port B
  -
@@ -88,17 +88,17 @@ blockram2p :: forall aaw baw aw bw .
                       , Unsigned bw, Bool)
            -> SignalP (Unsigned aw, Unsigned bw)
 
-blockram2p aaw baw aw bw (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = (qA, qB)
+blockram2p aaw baw aw bw (aAddr, aDIn, aWrEn, bAddr, bDIn, bWrEn) = (qA, qB)
     where
         (qAB, qBB) = withSNat (withSNat blockram2p') aaw baw aw bw
-                       (aAddrB) (aDinB) aWrEnB (bAddrB) (bDinB) bWrEnB
+                       (aAddrB) (aDInB) aWrEnB (bAddrB) (bDInB) bWrEnB
         qA = fromBV <$> qAB
         qB = fromBV <$> qBB
         aAddrB = toBV <$> aAddr
-        aDinB = toBV <$> aDin
+        aDInB = toBV <$> aDIn
         aWrEnB = (\b -> if b then H else L) <$> aWrEn
         bAddrB = toBV <$> bAddr
-        bDinB = toBV <$> bDin
+        bDInB = toBV <$> bDIn
         bWrEnB = (\b -> if b then H else L) <$> bWrEn
 
 blockram2p' :: forall an bn aaw baw aw bw mbw .
@@ -124,6 +124,6 @@ blockram2p' :: forall an bn aaw baw aw bw mbw .
 -- Simulation proved difficult, as I could not get the type proven correct. So
 -- simulation is defined for specific parameters in Simul.Toolbox.
 {-# NOINLINE blockram2p' #-}
-blockram2p' an bn aaw baw aw bw aAddrB aDinB aWrEnB bAddrB bDinB bWrEnB
+blockram2p' an bn aaw baw aw bw aAddrB aDInB aWrEnB bAddrB bDInB bWrEnB
     = (signal (vcopyI L), signal (vcopyI L))
 

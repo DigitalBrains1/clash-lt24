@@ -112,11 +112,11 @@ import Toolbox.Misc
  -}
 framebuffer (actionDaisy, dInDaisy, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
             , pixelColour, ltdin)
-    = ( readyDaisy, fbDout, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
+    = ( readyDaisy, fbDOut, updateDone, pixelVal, lt24DOut, lcdOn, csx, resx
       , dcx, wrx, rdx, ltdout, oe)
     where
 
-        (fbDout, myRamDOut) = blockram2p d12 d9 d2 d16
+        (fbDOut, myRamDOut) = blockram2p d12 d9 d2 d16
                             (fbAddr, fbDIn, fbWrEn, myRamAddr, myRamDIn
                             , myRamWrEn)
 
@@ -261,7 +261,7 @@ fbFSMO2 = FbFSMO2
  - This function merely wraps fbFSM1 and fbFSM2, passing all the signals from
  - and to, and even between them.
  -
- - That is, the inputs fbState', fbMyActionI and fbMyDinI, which are an input
+ - That is, the inputs fbState', fbMyActionI and fbMyDInI, which are an input
  - to fbFSM1, are actually passed from fbFSM2 (where they happen to be part of
  - the state).
  -

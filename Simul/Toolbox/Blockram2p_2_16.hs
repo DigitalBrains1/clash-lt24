@@ -50,17 +50,17 @@ blockram2p :: SNat 12
 
 -- Nearly identical to Toolbox.blockram2p; the only difference is that
 -- blockram2p' no longer takes the first two arguments `an` and `bn`.
-blockram2p aaw baw aw bw (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = (qA, qB)
+blockram2p aaw baw aw bw (aAddr, aDIn, aWrEn, bAddr, bDIn, bWrEn) = (qA, qB)
     where
         (qAB, qBB) = blockram2p' aaw baw aw bw
-                       (aAddrB) (aDinB) aWrEnB (bAddrB) (bDinB) bWrEnB
+                       (aAddrB) (aDInB) aWrEnB (bAddrB) (bDInB) bWrEnB
         qA = fromBV <$> qAB
         qB = fromBV <$> qBB
         aAddrB = toBV <$> aAddr
-        aDinB = toBV <$> aDin
+        aDInB = toBV <$> aDIn
         aWrEnB = (\b -> if b then H else L) <$> aWrEn
         bAddrB = toBV <$> bAddr
-        bDinB = toBV <$> bDin
+        bDInB = toBV <$> bDIn
         bWrEnB = (\b -> if b then H else L) <$> bWrEn
 
 {-
@@ -73,7 +73,7 @@ blockram2p aaw baw aw bw (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn) = (qA, qB)
  - Unsigneds and Bools. `blockram2p''` does the actual memory
  - access.
  -}
-blockram2p' aaw baw aw bw aAddrB aDinB aWrEnB bAddrB bDinB bWrEnB
+blockram2p' aaw baw aw bw aAddrB aDInB aWrEnB bAddrB bDInB bWrEnB
     = oD
     where
         aAddr = fromBV <$> aAddrB
@@ -82,7 +82,7 @@ blockram2p' aaw baw aw bw aAddrB aDinB aWrEnB bAddrB bDinB bWrEnB
         bWrEn = (== H) <$> bWrEnB
         iD = ( unpack
              . register (0, vcopyI L, False, 0, vcopyI L, False)
-             . pack) (aAddr, aDinB, aWrEn, bAddr, bDinB, bWrEn)
+             . pack) (aAddr, aDInB, aWrEn, bAddr, bDInB, bWrEn)
         oD = ( unpack . register (vcopyI L, vcopyI L) . pack) o
         o = (blockram2p'' aaw baw aw bw <^> vcopyI L) iD
 
@@ -107,15 +107,15 @@ blockram2p'' :: SNat 12
              -> Vec 8192 Bit
              -> (Unsigned 12, Vec 2 Bit, Bool, Unsigned 9, Vec 16 Bit, Bool)
              -> (Vec 8192 Bit, (Vec 2 Bit, Vec 16 Bit))
-blockram2p'' aaw baw aw bw s (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn)
+blockram2p'' aaw baw aw bw s (aAddr, aDIn, aWrEn, bAddr, bDIn, bWrEn)
     = (s', (qA, qB))
     where
-        sa' | aWrEn     = vconcat $ vreplace (vunconcatI s) aAddr aDin
+        sa' | aWrEn     = vconcat $ vreplace (vunconcatI s) aAddr aDIn
             | otherwise = s
         s'  | not bWrEn = sa'
             | aWrEn && overlap = error ($(showCodeLoc)
                                         ++ " blockram2p'': Write conflict")
-            | otherwise = vconcat $ vreplace (vunconcatI sa') bAddr bDin
+            | otherwise = vconcat $ vreplace (vunconcatI sa') bAddr bDIn
         qA = (vunconcatI s)!aAddr
         qB = (vunconcatI s)!bAddr
         astart = (fromIntegral aAddr) * awv

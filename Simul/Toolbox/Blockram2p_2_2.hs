@@ -68,15 +68,15 @@ blockram2p aaw baw aw bw i = oD
 blockram2p' :: Vec 4096 (Unsigned 2)
             -> (Unsigned 12, Unsigned 2, Bool, Unsigned 12, Unsigned 2, Bool)
             -> (Vec 4096 (Unsigned 2), (Unsigned 2, Unsigned 2))
-blockram2p' s (aAddr, aDin, aWrEn, bAddr, bDin, bWrEn)
+blockram2p' s (aAddr, aDIn, aWrEn, bAddr, bDIn, bWrEn)
     = (s', (qA, qB))
     where
-        sa' | aWrEn     = vreplace s aAddr aDin
+        sa' | aWrEn     = vreplace s aAddr aDIn
             | otherwise = s
         s'  | not bWrEn = sa'
             | aWrEn && overlap = error ($(showCodeLoc)
                                         ++ " blockram2p'': Write conflict")
-            | otherwise = vreplace sa' bAddr bDin
+            | otherwise = vreplace sa' bAddr bDIn
         qA = s!aAddr
         qB = s!bAddr
         overlap = aAddr == bAddr

@@ -101,16 +101,16 @@ initLt24' :: ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
           -> ( ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
              , (LT24.Action, Unsigned 16, Bool))
 
-initLt24' (i, si, ph) (ready, actionDaisy, lt24dinDaisy)
-    = ((i', si', ph'), (action, lt24din, readyDaisy))
+initLt24' (i, si, ph) (ready, actionDaisy, dInDaisy)
+    = ((i', si', ph'), (action, din, readyDaisy))
     where
         -- Daisy chain handling
-        (action, lt24din, readyDaisy)
-            | i == (0 - 2) = (actionDaisy, lt24dinDaisy, ready)
-            | i == (0 - 1) = (LT24.NOP   , 0           , True )
-            | otherwise    = (myAction   , myLt24din   , True )
+        (action, din, readyDaisy)
+            | i == (0 - 2) = (actionDaisy, dInDaisy, ready)
+            | i == (0 - 1) = (LT24.NOP   , 0       , True )
+            | otherwise    = (myAction   , myDIn   , True )
 
-        (myAction, myLt24din)
+        (myAction, myDIn)
             = case step of
                IlL a d       -> (a         , d           )
                IlDoPalette5b -> (LT24.Write, ( resize
@@ -151,9 +151,9 @@ initLt24' (i, si, ph) (ready, actionDaisy, lt24dinDaisy)
  - power on and reset.
  -}
 
-lt24WithInit (action_daisy, din_daisy, ltdin)
-    = (ready_daisy, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+lt24WithInit (actionDaisy, dInDaisy, ltdin)
+    = (readyDaisy, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
     where
-    (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
         = lt24 (action, din, ltdin)
-    (action, din, ready_daisy) = initLt24 (ready, action_daisy, din_daisy)
+    (action, din, readyDaisy) = initLt24 (ready, actionDaisy, dInDaisy)

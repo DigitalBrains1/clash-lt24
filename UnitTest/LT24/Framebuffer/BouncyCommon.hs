@@ -103,18 +103,18 @@ bouncyBall fb i = o
         (x, y) = (ballPos <^> (5, 7, BpDown, BpRight)) doUpdateD
         (xD, yD) = (delayCoords <^> (5, 7)) (x,y, doUpdateD)
         (wx, wy, rx, ry) = (unpack . (juggleCoords <$>) . pack) (x,y,xD,yD)
-        (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess)
+        (lt24AD, fbAddr, fbDIn, fbWrEn, doUpdate, needAccess)
             = (drawBall <^> DbInitDisp 0)
                 (wx, wy, rx, ry, accepted, period, buttonF)
 
         (action, din, accepted) = untilAccept (lt24AD, ready)
 
         pageStart = (resize . fromBV . toBV) <$> wy :: Signal (Unsigned 8)
-        ( ready, fbDout, updateDone, pixelVal, dout, lcdOn, csx, resx, dcx,
+        ( ready, fbDOut, updateDone, pixelVal, dout, lcdOn, csx, resx, dcx,
           wrx, rdx, ltdout, oe)
-            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart, doUpdate
+            = fb ( action, din, fbAddr, fbDIn, fbWrEn, pageStart, doUpdate
                  , pixelColour, ltdin)
---            = fb ( action, din, fbAddr, fbDin, fbWrEn, pageStart
+--            = fb ( action, din, fbAddr, fbDIn, fbWrEn, pageStart
 --                 , not <$> needAccess, pixelColour, ltdin)
         -- Black, black, red, blue
         pixelColour = ($(v [ 0x1F :: Unsigned 16, 0xF800, 0, 0 ])!)
@@ -210,7 +210,7 @@ data DbI = DbI
 data DbO = DbO
     { dbLt24AD :: Maybe (LT24.Action, Unsigned 16)
     , dbFbAddr :: Unsigned 12
-    , dbFbDin :: Unsigned 2
+    , dbFbDIn :: Unsigned 2
     , dbFbWrEn :: Bool
     , dbDoUpdate :: Bool
     , dbNeedAccess :: Bool
@@ -219,7 +219,7 @@ data DbO = DbO
 dbO = DbO
     { dbLt24AD = Nothing
     , dbFbAddr = 0
-    , dbFbDin = 0
+    , dbFbDIn = 0
     , dbFbWrEn = False
     , dbDoUpdate = False
     , dbNeedAccess = False
@@ -238,7 +238,7 @@ dbO = DbO
  - The button chooses the background colour: 0 when not pressed, 1 when pressed.
  -}
 drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
-    = (s', (lt24AD, fbAddr, fbDin, fbWrEn, doUpdate, needAccess))
+    = (s', (lt24AD, fbAddr, fbDIn, fbWrEn, doUpdate, needAccess))
     where
         i = DbI { dbWx = wx
                 , dbWy = wy
@@ -251,7 +251,7 @@ drawBall s (wx, wy, rx, ry, accepted, period, buttonF)
         (s', o) = drawBall' s i
         lt24AD = dbLt24AD o
         fbAddr = dbFbAddr o
-        fbDin = dbFbDin o
+        fbDIn = dbFbDIn o
         fbWrEn = dbFbWrEn o
         doUpdate = dbDoUpdate o
         needAccess = dbNeedAccess o
@@ -306,7 +306,7 @@ drawBall' s@(DbInitDisp n) i
 drawBall' s@(DbWriteRam x y ) i
     = ( s'
       , dbO { dbFbAddr = fromBV $ yBV <++> xBV
-            , dbFbDin  = d
+            , dbFbDIn  = d
             , dbFbWrEn = True
             , dbDoUpdate = s' == DbDone
             })
