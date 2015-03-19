@@ -77,6 +77,16 @@ import Toolbox.FClk
  -    ball in the next position) will be drawn.
  -  - Triggers `ballPos` to compute the next ball position.
  -  - Clears the register tracking button state.
+ -
+ - The Framebuffer and FramebufferRMW components also support asserting
+ - `doUpdate` several times while transferring the framebuffer. To do some
+ - basic testing of this functionality, another signal is included,
+ - `needAccess`. This signal is normally unused. The only purpose is to test
+ - the back-to-back updating triggered with multiple `doUpdate` assertions. If
+ - `needAccess` is True, the `drawBall` component needs to talk to the LT24
+ - display. By passing "not <$> needAccess" in place of `doUpdate` to fb (like
+ - in the commented code), `drawBall` gets a chance to talk to the display
+ - after the currently-running frambuffer transfer is completed.
  -}
 bouncyBall fb i = o
     where
@@ -129,8 +139,8 @@ combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
  -           `i` = Just (LT24.Write, 0xCAFE)
  -
  - This way of passing actions can make it easier to read; the disadvantage is
- - you can't burst back-to-back, you always lose a clock cycle in which
- - `accepted` first becomes True.
+ - you can't burst back-to-back at low clock frequencies, you always lose a
+ - clock cycle in which `accepted` first becomes True.
  -}
 untilAccept = untilAccept' <^> (LT24.NOP, 0, True)
 untilAccept' (c, d, lastReady) (i, ready)

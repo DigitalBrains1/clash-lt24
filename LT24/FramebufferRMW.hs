@@ -82,6 +82,12 @@ import Toolbox.Misc
  - `pageStart`: The y coordinate of the top-left corner of the 64x48
  -     framebuffer in the 320x240 display. Or equivalently, the top row.
  -
+ - Note that the dual port blockram is now instantiated with one 2-bit wide
+ - data port and one 16-bit wide data port. The caller of this CλaSH component
+ - still has the 2-bit per-pixel addressing that is also in LT24.Framebuffer.
+ - So there's no change for the caller. It is just the internals of this CλaSH
+ - component that have changed to accessing the memory with 16 bits at a time.
+ -
  - Because of this interleaved reading and writing process, this CλaSH
  - component now unfortunately has to know about the page range (the
  - y-coordinate range).  This necessarily means that you are limited to a 64x48
