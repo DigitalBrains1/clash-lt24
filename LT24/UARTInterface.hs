@@ -1,5 +1,31 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-
+ - Copyright (c) 2015, Peter Lebbing <peter@digitalbrains.com>
+ - All rights reserved.
+ - 
+ - Redistribution and use in source and binary forms, with or without
+ - modification, are permitted provided that the following conditions are met:
+ - 
+ - 1. Redistributions of source code must retain the above copyright notice,
+ - this list of conditions and the following disclaimer.
+ - 
+ - 2. Redistributions in binary form must reproduce the above copyright notice,
+ - this list of conditions and the following disclaimer in the documentation
+ - and/or other materials provided with the distribution.
+ - 
+ - THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ - AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ - IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ - ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ - LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ - CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ - SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ - INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ - CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ - ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ - POSSIBILITY OF SUCH DAMAGE.
+ -}
 
 module LT24.UARTInterface where
 
@@ -60,7 +86,7 @@ import Toolbox.FClk
  - < 01 2C 00       - LT24.Command completed; echoing value cRAMWR
  - > 03 34 12       - Read frame memory; dummy data ignored
  - < 03 EF BE       - Data from frame memory: 0xBEEF
- - > 07 01 00       - Set the "GPIO" output line high (supports up to 32)
+ - > 07 01 00       - Set the "GPIO" output pin high (supports up to 32 pins)
  - < 07 00 00       - Returns the GPIO inputs; none yet, so always 0
  - > 05 00 00       - Hold commands (doesn't cause a response)
  - > 01 2C 00       - LT24.Command: cRAMWR (no response yet; queued only)
@@ -80,12 +106,12 @@ intfInited = intf lt24WithInit
 intf lt24 i = o
     where
         o = ((combineOutput <$>) . pack)
-              (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
+              (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
 
         rxd = vhead <$> i
         ltdin = (fromBV . vtail) <$> i
 
-        (ready, dout, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe) =
+        (ready, dout, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe) =
             lt24 (action, din, ltdin)
 
         tTick = ($(CS.staticAvgRate fClk 115200) <^> 1)
@@ -105,8 +131,8 @@ intf lt24 i = o
  - topEntity are combined into a bitvector. The VHDL wrapper then untangles the
  - vector.
  -}
-combineOutput (gpioO, txd, lcd_on, csx, resx, dcx, wrx, rdx, ltdout, oe)
-    = ((gpioO :> txd :> lcd_on :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
+combineOutput (gpioO, txd, lcdOn, csx, resx, dcx, wrx, rdx, ltdout, oe)
+    = ((gpioO :> txd :> lcdOn :> csx :> resx :> dcx :> wrx :> rdx :> Nil)
        <++> toBV ltdout) <: oe
 
 -- Command interface
@@ -140,17 +166,20 @@ commandIf (rxoF, rxoV, txDone, ready, dout) = (txiV, txi, action, din, gpioO)
         (txi, txiV, rFifoRd) = (serResp <^> (0 :: Unsigned 2))
                                  (rFifoO, rFifoEmpty, txDone)
 
+-- Split the 3 received bytes into one byte command and one 16-bit data word
 splitRxVec i = (cmd, d)
     where
         cmd = vlast i
         d   = (fromBV . vconcat . vmap toBV . vinit) i
 
+-- Keeps the last 3 received bytes from the UART
 --           (rxo, rxoV  )
 groupBytes s (_  , False ) = (s ,s )
 groupBytes s (rxo, True  ) = (s',s')
     where
         s' = rxo +>> s
 
+-- True every three bytes (i.o.w., when a complete command has been received)
 countBytes :: Unsigned 2
            -> Bool
            -> (Unsigned 2, Bool)
@@ -162,6 +191,7 @@ countBytes s True  = (s', False)
     where
         s' = s - 1
 
+-- Handle the FIFO commands, and store the other commands in the FIFO
 --        fifoEn (rxC, cValid) = (fifoEn', (fifoEn', fifoWr))
 managFIFO fifoEn (rxC, False ) = (fifoEn , (fifoEn , False ))
 managFIFO _      (  5, True  ) = (False  , (False  , False ))
@@ -173,7 +203,8 @@ data PCState = PCIdle | PCWaitAccept | PCWaitReady
 {-
  - Pass commands to LT24.lt24
  -
- - Wait for 'cValid' indicating three bytes have been received from the PC.
+ - Wait for 'doCmd' indicating a command is available from the FIFO for
+ - execution.
  - Then pass the command and the data to LT24.lt24, and wait for that component
  - to signal acceptance and then completion.
  -
@@ -188,6 +219,10 @@ passCommand :: (PCState, Unsigned 8, Unsigned 16, Bit)
             -> ( (PCState, Unsigned 8, Unsigned 16, Bit)
                , (LT24.Action, Unsigned 16, Bit, Bool))
 
+{-
+ - Translates commands (command bytes to LT24.Action), the rest is handled by
+ - passCommand'.
+ -}
 passCommand (st, cbuf, dbuf, gpioOB) (cmd, d, doCmd, ready)
     = ( (st', cbuf', dbuf', gpioO) , (action, din, gpioO, fifoRd))
     where
@@ -204,39 +239,50 @@ passCommand (st, cbuf, dbuf, gpioOB) (cmd, d, doCmd, ready)
 
 --           PCState      cbuf dbuf gpioOB cmd d doCmd ready
 --    (PCState'    , cbuf', dbuf', gpioO , fifoRd)
+
+-- Stay idle
 passCommand' PCIdle       cbuf dbuf gpioOB cmd d False ready
     = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
-
+-- Handle GPIO command
 passCommand' PCIdle       cbuf dbuf gpioOB 7   d True  ready
     = (PCIdle      , cbuf , dbuf , gpioO , True  )
     where
         gpioO = vexact d0 (toBV d)
 
+-- Start LT24.lt24 action, pop command FIFO
 passCommand' PCIdle       cbuf dbuf gpioOB cmd d True  ready
     = (PCWaitAccept, cmd  , d    , gpioOB, True  )
 
+-- Wait for LT24.lt24 to accept action
 passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d doCmd True
     = (PCWaitAccept, cbuf , dbuf , gpioOB, False )
 
+-- LT24.lt24 accepted, wait for completion. cbuf = 255 maps to LT24.NOP.
 passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d False False
     = (PCWaitReady , 255  , dbuf , gpioOB, False )
 
+-- Exceptional handling for GPIO command: no shortcut
 passCommand' PCWaitAccept cbuf dbuf gpioOB 7   d True  False
     = (PCWaitReady , 255  , dbuf , gpioOB, False )
 
+-- Next command available, shortcut: offer next action already
 passCommand' PCWaitAccept cbuf dbuf gpioOB cmd d True  False
     = (PCWaitReady , cmd  , d    , gpioOB, False )
 
+-- No new command, wait for completion
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d doCmd False
     = (PCWaitReady , cbuf , dbuf , gpioOB, False )
 
+-- Exceptional handling for GPIO command: no shortcut
 passCommand' PCWaitReady  cbuf dbuf gpioOB 7   d True  True
     = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
+-- Action completed and new action queued; pop command FIFO
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d True  True
     = (PCWaitAccept, cbuf , dbuf , gpioOB, True  )
 
+-- Action completed and no new command, go idle
 passCommand' PCWaitReady  cbuf dbuf gpioOB cmd d False True
     = (PCIdle      , cbuf , dbuf , gpioOB, False )
 
@@ -279,16 +325,16 @@ returnData s@(RDState { rdMode = 0 }) (cmd, cmdD, True   , ready, dout) =
     where
         s' = RDState 1 cmd cmdD
 
--- Wait for command acceptance
+-- Wait for action acceptance
 returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, cFifoRd, True , dout) =
     (s               , ((0 , 0 ), False ))
 returnData s@(RDState { rdMode = 1 }) (cmd, cmdD, cFifoRd, False, dout) =
     (s { rdMode = 2 }, ((0 , 0 ), False ))
 
---Wait for command completion (rdMode = 2)
+--Wait for action completion (rdMode = 2)
 returnData s                          (cmd, cmdD, cFifoRd, False, dout) =
     (s               , ((0 , 0 ), False ))
--- Back-to-back commands, capture next command and report current
+-- Back-to-back actions, capture next command and report current
 returnData s                          (cmd, cmdD, True   , True , dout) =
     (s'              , ((rc, rd), True  ))
     where
@@ -301,6 +347,7 @@ returnData s                          (cmd, cmdD, True   , True , dout) =
                -- Echo request
                _ -> cmdDBuf s
 
+-- No back-to-back, report result and go idle
 returnData s                          (cmd, cmdD, False  , True , dout) =
     (s { rdMode = 0 }, ((rc, rd), True  ))
     where
@@ -314,6 +361,8 @@ returnData s                          (cmd, cmdD, False  , True , dout) =
 
 {-
  - Serialize a response from the response FIFO to the serial port
+ -
+ - It splits the response in its three constituent bytes
  -}
 --      s ((rc, rd), rFifoEmpty, txDone) = (s', (txi, txiV , rFifoRd))
 serResp s ((rc, rd), _         , False ) = (s , (0  , False, False  ))

@@ -1,5 +1,31 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-
+ - Copyright (c) 2015, Peter Lebbing <peter@digitalbrains.com>
+ - All rights reserved.
+ - 
+ - Redistribution and use in source and binary forms, with or without
+ - modification, are permitted provided that the following conditions are met:
+ - 
+ - 1. Redistributions of source code must retain the above copyright notice,
+ - this list of conditions and the following disclaimer.
+ - 
+ - 2. Redistributions in binary form must reproduce the above copyright notice,
+ - this list of conditions and the following disclaimer in the documentation
+ - and/or other materials provided with the distribution.
+ - 
+ - THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ - AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ - IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ - ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ - LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ - CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ - SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ - INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ - CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ - ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ - POSSIBILITY OF SUCH DAMAGE.
+ -}
 
 module LT24.Init
        ( initLt24
@@ -30,8 +56,8 @@ import Toolbox.FClk
  -
  -      IlL a d        -- Literal: send an action a and din d to lt24.
  -      IlDoPalette5b  -- Write the 32 palette values that initialise the
- -                        palette of a subpixel to a direct color mapping.
- -      IlDoPalette6b  -- Write the 64 palette values for green
+ -                        palette of a subpixel to a direct colour mapping.
+ -      IlDoPalette6b  -- Write the 64 direct colour palette values for green
  -      IlWait n       -- Wait for n clockticks
  -      IlWipeFb       -- Write 320*240 (=76,800) zeroes to the display
  -
@@ -41,9 +67,9 @@ import Toolbox.FClk
  -
  - It is designed to be daisy-chained with the component that handles the
  - display after initialisation. As long as initialisation is running, the
- - daisy-chained component never sees its command being accepted (by ready going
- - to False). After the initialization is done, initLt24 is transparent, simply
- - passing the commands and data from the daisy-chained component.
+ - daisy-chained component never sees its command being accepted (by ready
+ - going to False). After the initialization is done, initLt24 is transparent,
+ - simply passing the commands and data from the daisy-chained component.
  -
  - `i` indexes initSteps. After running from the highest-numbered, i.e.,
  - first, element down to 0, there are two further final steps which are
@@ -51,6 +77,10 @@ import Toolbox.FClk
  - Unsigned for i. Step -1 waits for LT24.lt24 to complete, and -2 is the
  - final state, which is never left, where initLt24 is transparent and
  - dormant.
+ -
+ - `i` needs to be large enough to address all initSteps elements, in other
+ - words, (vlength initSteps - 1), plus the two final states -1 and -2. Hence
+ - the uToFit expression in the type declaration below.
  -
  - `si` is "subindex" and keeps track of the progress of the execution of the
  - current element from initSteps. For instance, it iterates the palette
@@ -61,6 +91,7 @@ import Toolbox.FClk
  -
  - Interpretation hint: `im` and `ni` stand for "i minus" and "next i"
  - respectively.
+ -
  -}
 
 initLt24 = initLt24' <^> (fromInteger $ vlength initSteps - 1, 0, L)
@@ -73,10 +104,12 @@ initLt24' :: ($(uToFit $ vlength initSteps + 1), IlSIndex, Bit)
 initLt24' (i, si, ph) (ready, actionDaisy, lt24dinDaisy)
     = ((i', si', ph'), (action, lt24din, readyDaisy))
     where
+        -- Daisy chain handling
         (action, lt24din, readyDaisy)
             | i == (0 - 2) = (actionDaisy, lt24dinDaisy, ready)
             | i == (0 - 1) = (LT24.NOP   , 0           , True )
             | otherwise    = (myAction   , myLt24din   , True )
+
         (myAction, myLt24din)
             = case step of
                IlL a d       -> (a         , d           )

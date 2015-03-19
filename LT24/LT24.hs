@@ -1,5 +1,31 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-
+ - Copyright (c) 2015, Peter Lebbing <peter@digitalbrains.com>
+ - All rights reserved.
+ - 
+ - Redistribution and use in source and binary forms, with or without
+ - modification, are permitted provided that the following conditions are met:
+ - 
+ - 1. Redistributions of source code must retain the above copyright notice,
+ - this list of conditions and the following disclaimer.
+ - 
+ - 2. Redistributions in binary form must reproduce the above copyright notice,
+ - this list of conditions and the following disclaimer in the documentation
+ - and/or other materials provided with the distribution.
+ - 
+ - THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ - AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ - IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ - ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ - LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ - CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ - SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ - INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ - CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ - ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ - POSSIBILITY OF SUCH DAMAGE.
+ -}
 
 module LT24.LT24
        ( Action(..)
@@ -28,10 +54,6 @@ instance Lift Action where
 data LTState = LTIdle | LTReset | LTRead | LTWrite
     deriving (Show, Eq)
 
--- TODO: Proper timing
--- TODO: ltdout is apparently delayed too much
--- TODO: Proper buffering to maximally shorten combinatorial path
-
 {-
  - Interface to the LT24 LC-display
  -
@@ -47,8 +69,8 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  - `din`     - (Unsigned 16) Data for controller data bus: a command from
  -             LT24.Commands, or parameters for the commands, or data for the
  -             frame memory.
- - `ltdin`   - (Unsigned 16) Connected to the tri-state buffer which is
- -             connected to the LT24 data bus.
+ - `ltdin`   - (Unsigned 16) Connected to the register which is connected to
+ -             the LT24 data bus.
  -
  - Outputs:
  -
@@ -72,8 +94,8 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  -             the LT24. Note that what the Ilitek datasheet calls "D/CX" is
  -             called "RS" by the SGD datasheet, the LT24 schematic and the
  -             Terasic System Builder. Quite annoying.
- - `ltdout`  - (Unsigned 16) Connected to the tri-state buffer which is
- -             connected to the LT24 data bus.
+ - `ltdout`  - (Unsigned 16) Connected to the registered tri-state buffer which
+ -             is connected to the LT24 data bus.
  - `oe`      - (Bit) Output Enable for tri-state buffer.
  -
  - The interface to this component is through `action`, `din`, `ready` and
@@ -88,9 +110,10 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  - back-to-back, starting the next action only a single cycle after the result
  - of the previous action was produced.
  -
- - This means that as soon as `ready` transitions to False to indicate command
- - acceptance, the next action or NOP should be passed to `action`. `action`
- - should not be allowed to "linger", lest it be executed twice.
+ - This means that in the cycle that `ready` has transitioned to False to
+ - indicate command acceptance, the next action or NOP should be passed to
+ - `action` in that same cycle! `action` should not be allowed to "linger",
+ - lest it be executed twice.
  -
  - There are two timing profiles for reads: ReadID and ReadFM, as indicated on
  - page 238 of the Ilitek datasheet. I could not find conclusive documentation,
@@ -100,8 +123,28 @@ data LTState = LTIdle | LTReset | LTRead | LTWrite
  -
  - The backlight is always on and Chip Select is always active.
  -
- - Output Enable (oe) and Write (wrx) are delayed to be in sync with the update
- - to the 3-state output buffer.
+ - All outputs to the display are registered (in edgeBufO) except for ltdout.
+ - The reason is that ltdout is registered external to the CλaSH design, in
+ - VHDL. So the register is still there, it's just not right here.
+ -
+ - Also the inputs are registered. `action` and `din` are in cmdBufI, ltdin
+ - again is registered external to CλaSH.
+ -
+ - `dout` however is not registered. cmdBufO does maintain its value in between
+ - reads, but on a read, `dout` comes straight from ltdin.
+ -
+ - The D in the names `actionD` and `dinD` means "Delayed"; because of the
+ - register, they lag with one cycle with regard to the inputs with that name.
+ -
+ - Timing is central to this component. Every change is usually followed by a
+ - number of cycles in which `wait` is counting down towards the proper time of
+ - the next change. The actual amount of wait cycles is computed from the clock
+ - frequency using Template Haskell, and defined in LT24.Timing.
+ -
+ - This component is in one of three states: doing nothing, first phase (where
+ - rdx or wrx is low) or second phase where rdx or wrx needs to be kept high
+ - for a while. In this second phase, LTState is already LTIdle, but `wait` is
+ - still counting down towards zero before the next action can be accepted.
  -}
 
 lt24 (action, din, ltdin)

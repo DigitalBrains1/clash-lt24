@@ -1,0 +1,57 @@
+This is an implementation to access the LT24 display module from a Terasic
+DE0-Nano board in CλaSH. It includes CλaSH components to transfer a 64x48 2bpp
+framebuffer held in a single blockram to anywhere on the 320x240 display.
+
+In UnitTest.LT24.Framebuffer you'll find a small demo application with a ball
+that bounces against the screen borders. It shows how you can use
+LT24.Framebuffer and LT24.FramebufferRMW.
+
+This code is for CλaSH v0.3.3 with CλaSH Prelude v0.5.1 (and should work with
+slightly older versions). It does not work with newer versions yet as quite
+some things have changed.
+
+Code is included to trace LT24 actions, so you can simulate from CλaSH and see
+what's happening on your terminal. But it's not nicely integrated; it's not a
+matter of flipping a switch. Currently, you need to make the following changes:
+	Toolbox/FClk.hs:
+		Change fClk to 1 to eliminate all wait states.
+	LT24/Init.hs:
+		Change:
+		  import LT24.LT24 (lt24)
+		  --import Simul.LT24.DummyLT24 (lt24)
+		to:
+		  --import LT24.LT24 (lt24)
+		  import Simul.LT24.DummyLT24 (lt24)
+	LT24/InitSteps.hs:
+		Either insert comments to make initSteps equal to Nil, or
+		massage it otherwise to make sure you're not watching a /lot/
+		of useless information. IlWipeFb causes 76,800 writes of the
+		value 0; you do not want to simulate that, trust me :).
+		
+		Example of strategically placed comment markers:
+		
+		initSteps ={- IlL LT24.Reset   0
+			  :> IlL LT24.Command cMADCTL
+
+			  [...]
+			  
+			  :> IlL LT24.Command cDISPON
+			  :>-} Nil
+		
+		That way, you only need to enter "{-" and "-}". Plus, it looks
+		like a smiley.
+	LT24/Framebuffer.hs
+		Change:
+			import Toolbox.Blockram2p
+			--import Simul.Toolbox.Blockram2p_2_2
+		to:
+			--import Toolbox.Blockram2p
+			import Simul.Toolbox.Blockram2p_2_2
+	LT24/FramebufferRMW.hs
+		Change:
+			import Toolbox.Blockram2p
+			--import Simul.Toolbox.Blockram2p_2_16
+		to:
+			--import Toolbox.Blockram2p
+			import Simul.Toolbox.Blockram2p_2_16
+
