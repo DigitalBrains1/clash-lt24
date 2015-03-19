@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import struct
 import sys
 import codecs
-
+import time
 import serial
 
 class UartIf(object):
@@ -77,6 +77,7 @@ class UartIf(object):
 
     def lt24_reset(self, data = 0):
         self.send_command(0, data)
+        time.sleep(0.2)
         self.read_reply(0, data)
 
     def lt24_command(self, data):
@@ -175,3 +176,30 @@ class UartIf(object):
             self.gradient(0, 32)
             self.gradient(1, 16)
 
+    def pixel_counter(self, n):
+        """Write a count in the green subpixel"""
+        for i in range(n):
+            self.lt24_write(i << 5)
+
+    def read_pixels(self, n):
+        pixels = list()
+        for i in range(n // 2):
+            w1 = self.lt24_read_fm()
+            w2 = self.lt24_read_fm()
+            w3 = self.lt24_read_fm()
+            g1 = (w1 >> 2) & 63
+            r1 = w1 >> 10
+            r2 = (w2 >> 2) & 63
+            b1 = w2 >> 10
+            b2 = (w3 >> 2) & 63
+            g2 = w3 >> 10
+            pixels.append((r1, g1, b1))
+            pixels.append((r2, g2, b2))
+        if n % 2:
+            w1 = self.lt24_read_fm()
+            w2 = self.lt24_read_fm()
+            g1 = (w1 >> 2) & 63
+            r1 = w1 >> 10
+            b1 = w2 >> 10
+            pixels.append((r1, g1, b1))
+        return pixels
