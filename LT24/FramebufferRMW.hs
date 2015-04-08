@@ -3,17 +3,17 @@
 {-
  - Copyright (c) 2015, Peter Lebbing <peter@digitalbrains.com>
  - All rights reserved.
- - 
+ -
  - Redistribution and use in source and binary forms, with or without
  - modification, are permitted provided that the following conditions are met:
- - 
+ -
  - 1. Redistributions of source code must retain the above copyright notice,
  - this list of conditions and the following disclaimer.
- - 
+ -
  - 2. Redistributions in binary form must reproduce the above copyright notice,
  - this list of conditions and the following disclaimer in the documentation
  - and/or other materials provided with the distribution.
- - 
+ -
  - THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  - AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  - IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -550,7 +550,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead4 n
         b1 = pal6bTo5b $ resize $ dat `shiftR` 10
         r2 = pal6bTo5b $ resize $ dat `shiftR` 2
 
-{- 
+{-
  - Wait for third read to be accepted.
  - If we've processed the whole batch of 128 pixels, don't queue another
  - action, otherwise queue the next read.
@@ -566,7 +566,7 @@ fbFSM2 s@(FbFSMS { fbState = FbRead5 n })
         nextAction | n == 127  = LT24.NOP
                    | otherwise = LT24.ReadFM
 
-{- 
+{-
  - Wait for third read to complete, compute and store second pixel.
  - If we've processed the whole batch of 128 pixels, continue to the write
  - phase. Otherwise, continue with the next read.
@@ -635,7 +635,7 @@ fbFSM2 s@(FbFSMS { fbState = FbWrite2 n })
         state' | n == 127  = FbFinish1
                | otherwise = FbWrite1 (n+1)
 
-{- 
+{-
  - Wait for final write to be accepted.
  - If we're not done yet, queue read command.  Otherwise, finish up (fbMyDInS
  - will be ignored).
@@ -655,7 +655,7 @@ fbFSM2 s@(FbFSMS { fbState = FbFinish1 })
         action | coordsDone = LT24.NOP
                | otherwise  = LT24.Command
 
-{- 
+{-
  - Wait for final write to complete, then continue or close up shop.
  - If we haven't transferred all pixels yet, transfer next block
  - Otherwise, if another update is requested, start over at the top.
