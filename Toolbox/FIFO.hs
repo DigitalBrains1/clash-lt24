@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-
+ - Copyright (c) 2012-2015, University of Twente
  - Copyright (c) 2015, Peter Lebbing <peter@digitalbrains.com>
  - All rights reserved.
  -
@@ -28,8 +29,9 @@
  - CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  - ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  - POSSIBILITY OF SUCH DAMAGE.
+ -
+ - This file is based on examples/Fifo.hs from the CλaSH source code.
  -}
-
 module Toolbox.FIFO
        ( Pntr
        , fifo
